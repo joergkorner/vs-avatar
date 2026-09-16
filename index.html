@@ -1862,7 +1862,9 @@ L.control.scale({imperial: false}).addTo(map);
 // bis man von Hand zoomte. Jetzt hängen alle Kacheln beider Schichten in einer gemeinsamen Warteschlange: höchstens KACHEL_GLEICH sind
 // unterwegs, der Rest wartet; eine gescheiterte kommt bis viermal mit wachsendem Abstand zurück in die Schlange. Kacheln, die Leaflet
 // inzwischen weggeworfen hat (weil weitergezoomt wurde), werden übersprungen, damit die Schlange nicht mit Altlasten verstopft.
-const KACHEL_GLEICH = 6, KACHEL_VERSUCHE = 4;
+const KACHEL_GLEICH = 6, KACHEL_VERSUCHE = 4, KACHEL_ZEIT = 15000;
+// Eine Anfrage, die weder ankommt noch abbricht (Safari lässt sie offen), hielt ihren Platz in der Schlange für immer besetzt —
+// nach sechs solchen war Schluss mit Kacheln, bis man die Seite neu lud (Jörg 16.9.). Darum eine Zeitgrenze je Kachel.
 let kachelOffen = 0; const kachelWarte = [];
 // (der Start läuft über setTimeout: Leaflet trägt die Kachel erst NACH createTile in seine Liste ein — startete die Schlange sofort,
 //  hielt die Prüfung «schon weggezoomt» jede erste Kachel für veraltet und es ging gar nichts mehr hinaus)
@@ -1873,12 +1875,13 @@ const KachelSchicht = L.TileLayer.extend({
     const tile = document.createElement("img");
     tile.setAttribute("role", "presentation"); tile.alt = "";
     const url = this.getTileUrl(coords), lay = this, schl = this._tileCoordsToKey(coords);
-    let versuch = 0, fertig = false;
-    const ab = (fehler) => { if (fertig) return; kachelOffen--; kachelNext();
+    let versuch = 0, fertig = false, laeuft = false, wecker = null;
+    const ab = (fehler) => { if (fertig || !laeuft) return; laeuft = false; clearTimeout(wecker); kachelOffen--; kachelNext();
       if (!fehler) { fertig = true; done(null, tile); return; }
       if (++versuch < KACHEL_VERSUCHE) setTimeout(() => kachelAnstellen(los), 1200 * versuch * versuch);
       else { fertig = true; done(new Error("Kachel"), tile); } };
     const los = () => { if (!lay._tiles || !lay._tiles[schl]) { kachelOffen--; kachelNext(); return; }   // schon weggezoomt
+      laeuft = true; wecker = setTimeout(() => ab(true), KACHEL_ZEIT);          // hängt die Anfrage, gibt sie ihren Platz wieder frei
       tile.onload = () => ab(false); tile.onerror = () => ab(true);
       tile.src = versuch ? url + (url.indexOf("?") < 0 ? "?" : "&") + "n=" + versuch : url; };
     kachelAnstellen(los);
