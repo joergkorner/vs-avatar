@@ -2029,8 +2029,13 @@ let WAN = false, W_WERT = 1.0, BASIS = 0;          // W-Regler (an/aus, Wert), B
 // aber auf der Skala W_tag des Korpus (Median über alle guten Flüge des Tages von Kreisgewinn/Kreiszeit). Aus 616 Korpusflügen gemessen,
 // Regression für Flüge über 50 km: W_tag = 0.34 · W_flug + 0.65 (r = 0.57). Ohne diese Umrechnung landete jede XC-IGC am oberen Anschlag
 // und der Avatar bekam einen um rund 20 % zu hohen Tagesfaktor und eine 200–300 m zu hohe Decke.
+// Der Avatar ist mit dem UNGEEICHTEN Flug-W gegen Philipp gestimmt worden (Tagesfaktor, Steigkappe, Politik). Schaltet man die Eichung
+// allein ein, fällt er unter seine eigene Eichung und kommt nirgends mehr an (22.4.2025 XFH: 0 von 100). Darum steht sie auf aus, bis die
+// Kampagne gegen Philipp auf der Tages-Skala wiederholt ist. Zum Einschalten: W_EICHUNG_AN auf true.
+const W_EICHUNG_AN = false;
 const W_EICH_A = 0.34, W_EICH_B = 0.65;
-function wTagVon(wFlug) { return Math.round(Math.min(2.0, Math.max(0.3, W_EICH_A * wFlug + W_EICH_B)) * 10) / 10; }
+function wTagVon(wFlug) { return !W_EICHUNG_AN ? Math.round(Math.min(2.0, Math.max(0.3, wFlug)) * 10) / 10
+  : Math.round(Math.min(2.0, Math.max(0.3, W_EICH_A * wFlug + W_EICH_B)) * 10) / 10; }
 let STARTZEIT = 11.0, START_MANUELL = false, START_GEWAEHLT = null;   // START_GEWAEHLT: Kandidaten der letzten Startwahl des Avatars [{zeit, erwartet_min}]       // Startzeit (Ortszeit); Vorgabe aus typischer Startzeit der Piloten bei diesem W, von Hand überschreibbar
 function startTypisch(W) {                           // Median der Startzeit der Flüge ab 2 h Dauer, als Gerade in W (meta.start_typisch)
   const S = META.start_typisch; if (!S) return 11.0;
@@ -2841,8 +2846,11 @@ function wVermerk() {                        // welches W dieser Lauf benutzt �
   if (!WAN) return de ? "Thermik W: alle Tage gemischt · Feld «alle»" : "Thermals W: all days mixed · field “all”";
   const ausIgc = PILOT && PILOT.W != null && Math.abs(PILOT.W - W_WERT) < 0.05;
   if (ausIgc && PILOT.W_flug != null)
-    return de ? `Thermik W ${W_WERT.toFixed(1)} m/s (der Tag) — aus der IGC gerechnet; der Flug selbst steigt im Kreisen ${PILOT.W_flug.toFixed(1)} m/s · Feld ${W_SEL}`
-              : `Thermals W ${W_WERT.toFixed(1)} m/s (the day) — derived from the IGC; the flight itself climbs ${PILOT.W_flug.toFixed(1)} m/s while circling · field ${W_SEL}`;
+    return W_EICHUNG_AN
+      ? (de ? `Thermik W ${W_WERT.toFixed(1)} m/s (der Tag) — aus der IGC gerechnet; der Flug selbst steigt im Kreisen ${PILOT.W_flug.toFixed(1)} m/s · Feld ${W_SEL}`
+            : `Thermals W ${W_WERT.toFixed(1)} m/s (the day) — derived from the IGC; the flight itself climbs ${PILOT.W_flug.toFixed(1)} m/s while circling · field ${W_SEL}`)
+      : (de ? `Thermik W ${W_WERT.toFixed(1)} m/s — aus der IGC (Steigen des Flugs im Kreisen; Eichung auf den Tag ist aus) · Feld ${W_SEL}`
+            : `Thermals W ${W_WERT.toFixed(1)} m/s — from the IGC (the flight's circling climb; day calibration is off) · field ${W_SEL}`);
   return de ? `Thermik W ${W_WERT.toFixed(1)} m/s — ${ausIgc ? "aus der IGC" : "von Hand gesetzt"} · Feld ${W_SEL}`
             : `Thermals W ${W_WERT.toFixed(1)} m/s — ${ausIgc ? "from the IGC" : "set by hand"} · field ${W_SEL}`;
 }
