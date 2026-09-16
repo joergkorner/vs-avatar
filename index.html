@@ -2179,7 +2179,7 @@ const Ebene = L.Layer.extend({
     L.DomUtil.setTransform(c, map.containerPointToLayerPoint([0, 0]), 1);
     const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, s.x, s.y); zeichne(g, s); }
 });
-const LABEL_GITTER = 150;                 // Abstand der Beschriftungs-Anker in Bildpunkten
+const LABEL_GITTER = 150, LABEL_ZOOM = 11;   // Abstand der Beschriftungs-Anker in Bildpunkten; ab dieser Zoomstufe stehen die Zahlen
 let sichtbareBaerte = [];
 const ebene = new Ebene().addTo(map);
 function cp(la, lo) { return map.latLngToContainerPoint([la, lo]); }
@@ -2221,9 +2221,10 @@ function zeichne(g, s) {
       g.beginPath(); for (let i = 0; i < p.length; i += 4) { g.moveTo(p[i], p[i + 1]); g.lineTo(p[i + 2], p[i + 3]); } g.stroke();
     }
     g.setLineDash([]);
-    // Die Zahlen stehen nur im Stillstand (Jörg 16.9.): beim Abspielen ändert sich das Feld ständig, und sie flackerten.
+    // Die Zahlen stehen auch beim Abspielen (Jörg 16.9.), aber nur bei nahem Zoom — von weit weg wären sie nur Unruhe.
+    // Ruhig bleiben sie über das Gitter oben: je Feld von 150 Bildpunkten eine.
     g.font = "10px -apple-system, Helvetica, Arial"; g.textAlign = "center"; g.textBaseline = "middle";
-    for (const [k, x, y] of (spiel ? [] : labels)) { const c = k * STUFE, s_ = (c > 0 ? "+" : "") + c.toFixed(1); g.lineWidth = 3; g.strokeStyle = "rgba(255,255,255,.9)"; g.strokeText(s_, x, y); g.fillStyle = k > 0 ? "#123a8c" : k < 0 ? "#2b2a26" : "#6e6a61"; g.fillText(s_, x, y); }
+    for (const [k, x, y] of (map.getZoom() >= LABEL_ZOOM ? labels : [])) { const c = k * STUFE, s_ = (c > 0 ? "+" : "") + c.toFixed(1); g.lineWidth = 3; g.strokeStyle = "rgba(255,255,255,.9)"; g.strokeText(s_, x, y); g.fillStyle = k > 0 ? "#123a8c" : k < 0 ? "#2b2a26" : "#6e6a61"; g.fillText(s_, x, y); }
   }
   sichtbareBaerte = [];
   if (an.baerte && BAERTE) zeichneBaerte(g, s, PX, PY);
