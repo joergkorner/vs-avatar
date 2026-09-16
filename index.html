@@ -2209,9 +2209,8 @@ function zeichne(g, s) {
       // beim Abspielen ändert sich das Feld leicht, die Zählung verschiebt sich und die Zahlen flackerten über den Schirm.
       // Jetzt steht eine Zahl nur da, wo eine Linie ein festes Gitter kreuzt; der Platz bleibt, solange die Linie dort bleibt.
       if (cl === 1) { const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-        const ax = Math.round(mx / LABEL_GITTER), ay = Math.round(my / LABEL_GITTER);
-        if (Math.abs(mx - ax * LABEL_GITTER) < 3 && Math.abs(my - ay * LABEL_GITTER) < 3) {
-          const schl = ax + "," + ay; if (!anker.has(schl)) { anker.add(schl); labels.push([k, ax * LABEL_GITTER, ay * LABEL_GITTER]); } } }
+        const schl = Math.floor(mx / LABEL_GITTER) + "," + Math.floor(my / LABEL_GITTER);      // je Gitterfeld eine Zahl
+        if (!anker.has(schl)) { anker.add(schl); labels.push([k, mx, my]); } }
     });
     g.lineJoin = "round"; g.lineCap = "round";
     for (const cl of [4, 3, 2, 1]) for (const kk in pfade[cl]) {
