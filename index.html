@@ -722,6 +722,7 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
 #protzeig.auf::after { transform: rotate(45deg); margin-bottom: 3px; }
 #protokoll { margin: 6px 0 0; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6e6a61; white-space: pre-wrap; max-height: 220px; overflow: auto; background: #f4f3f0; border-radius: 6px; padding: 6px 8px; }
 #protokoll .kopfz { font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; color: #2b2a26; display: block; margin-bottom: 5px; }
+#protokoll .kopfw { font: 11.5px/1.45 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; color: #6e6a61; display: block; margin-bottom: 7px; }
 #vergleich #vg_anteil, #vergleich #vg_luft { height: 46px; }
 #legende span.l { display: inline-block; width: 22px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 4px; }
 #legende span.k { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
@@ -2024,6 +2025,12 @@ function gurtSetzen(ja) {                            // Antwort (Fenster oder K�
   gurtAnzeigen(); gurtFragen(false); avatarRechnen();
 }
 let WAN = false, W_WERT = 1.0, BASIS = 0;          // W-Regler (an/aus, Wert), Basis-Regler (m gegenüber dem typischen Tag)
+// Eichung Flug-W → Tages-W (Jörg 16.9.): der Median der Bärte EINES Flugs misst den Piloten, die Feldklassen und Tagesfaktoren stehen
+// aber auf der Skala W_tag des Korpus (Median über alle guten Flüge des Tages von Kreisgewinn/Kreiszeit). Aus 616 Korpusflügen gemessen,
+// Regression für Flüge über 50 km: W_tag = 0.34 · W_flug + 0.65 (r = 0.57). Ohne diese Umrechnung landete jede XC-IGC am oberen Anschlag
+// und der Avatar bekam einen um rund 20 % zu hohen Tagesfaktor und eine 200–300 m zu hohe Decke.
+const W_EICH_A = 0.34, W_EICH_B = 0.65;
+function wTagVon(wFlug) { return Math.round(Math.min(2.0, Math.max(0.3, W_EICH_A * wFlug + W_EICH_B)) * 10) / 10; }
 let STARTZEIT = 11.0, START_MANUELL = false, START_GEWAEHLT = null;   // START_GEWAEHLT: Kandidaten der letzten Startwahl des Avatars [{zeit, erwartet_min}]       // Startzeit (Ortszeit); Vorgabe aus typischer Startzeit der Piloten bei diesem W, von Hand überschreibbar
 function startTypisch(W) {                           // Median der Startzeit der Flüge ab 2 h Dauer, als Gerade in W (meta.start_typisch)
   const S = META.start_typisch; if (!S) return 11.0;
@@ -2828,17 +2835,28 @@ const GRUND_EN = {"abgesoffen": "sank out", "abgesoffen beim Soaren": "sank out 
   "Fehlversuch unter Grund": "failed attempt below ground", "Luftraum unterwegs": "airspace on the way", "kein offener Zustand": "no open state", "keine Aufgabe": "no task"};
 function grText(g) { return LANG === "en" && g && GRUND_EN[g] ? GRUND_EN[g] : (g || ""); }
 // Protokoll der Rechnung (Jörg 16.9.): unten steht nur «Rechnung läuft», die Meldungen sammeln sich hier und sind über den Link zu sehen
-let PROTOKOLL = [];
-function protokollZeigen() {                 // Kopfzeile (das Ergebnis) und darunter die Meldungen der Rechnung
+let PROTOKOLL = [], PROT_W = "";
+function wVermerk() {                        // welches W dieser Lauf benutzt — Vermerk im Protokoll (Jörg 16.9.)
+  const de = LANG === "de";
+  if (!WAN) return de ? "Thermik W: alle Tage gemischt · Feld «alle»" : "Thermals W: all days mixed · field “all”";
+  const ausIgc = PILOT && PILOT.W != null && Math.abs(PILOT.W - W_WERT) < 0.05;
+  if (ausIgc && PILOT.W_flug != null)
+    return de ? `Thermik W ${W_WERT.toFixed(1)} m/s (der Tag) — aus der IGC gerechnet; der Flug selbst steigt im Kreisen ${PILOT.W_flug.toFixed(1)} m/s · Feld ${W_SEL}`
+              : `Thermals W ${W_WERT.toFixed(1)} m/s (the day) — derived from the IGC; the flight itself climbs ${PILOT.W_flug.toFixed(1)} m/s while circling · field ${W_SEL}`;
+  return de ? `Thermik W ${W_WERT.toFixed(1)} m/s — ${ausIgc ? "aus der IGC" : "von Hand gesetzt"} · Feld ${W_SEL}`
+            : `Thermals W ${W_WERT.toFixed(1)} m/s — ${ausIgc ? "from the IGC" : "set by hand"} · field ${W_SEL}`;
+}
+function protokollZeigen() {                 // Kopfzeile (das Ergebnis), Tagesstärke, darunter die Meldungen der Rechnung
   const e = document.getElementById("protokoll"); if (!e) return;
   const kopf = document.getElementById("status").textContent;
   const t0 = PROTOKOLL.length ? PROTOKOLL[0][0] : 0;
-  e.innerHTML = (kopf ? `<span class="kopfz"></span>` : "") +
+  e.innerHTML = (kopf ? `<span class="kopfz"></span>` : "") + (PROT_W ? `<span class="kopfw"></span>` : "") +
     PROTOKOLL.map(([t, x]) => ((t - t0) / 1000).toFixed(1).padStart(5) + " s  " + x).join("\n");
   if (kopf) e.querySelector(".kopfz").textContent = kopf;
-  document.getElementById("protzeig").style.display = (kopf || PROTOKOLL.length) ? "" : "none";
+  if (PROT_W) e.querySelector(".kopfw").textContent = PROT_W;
+  document.getElementById("protzeig").style.display = (kopf || PROT_W || PROTOKOLL.length) ? "" : "none";
 }
-function protokollLeeren() { PROTOKOLL = []; const k = document.getElementById("protzeig");
+function protokollLeeren() { PROTOKOLL = []; PROT_W = ""; const k = document.getElementById("protzeig");
   document.getElementById("protokoll").textContent = ""; k.style.display = "none"; k.classList.remove("auf");
   document.getElementById("protokoll").style.display = "none"; }
 function protokollZeile(txt) { if (!PROTOKOLL.length) PROTOKOLL.push([Date.now(), txt]); else PROTOKOLL.push([Date.now(), txt]); protokollZeigen(); }
@@ -2854,7 +2872,7 @@ function rechnungAn(detail) {
 function rechnungAus() { document.getElementById("banner").style.display = "none"; }
 async function avatarRechnen() {
   if (!AUFG) return;
-  const wk = wkVon(W_SEL); protokollLeeren(); rechnungAn();
+  const wk = wkVon(W_SEL); protokollLeeren(); PROT_W = wVermerk(); rechnungAn();
   const bufs = await Promise.all(META.stunden.map(H => lade(H, wk)));
   const key = W_SEL === "alle" ? "alle" : (+W_SEL).toFixed(1);
   if (!START_MANUELL) STARTZEIT = startVorgabe();                    // Basis der Startwahl ist immer die Vorgabe (typisch für W, früh wenn lang) — nicht die letzte Wahl
@@ -3192,15 +3210,16 @@ async function igcLaden(file) {
   PILOT = {p: I.pts.map(p => [p[0] - I.pts[A.i0][0], p[1], p[2], p[3]]), t0h: A.start.zeit, name: t("pilot"), datum: I.datum, datei: I.name, i1: A.i1, kreis: I.kreis};
   // W des Flugs, auf den Tagesgang normiert (Gang des Korpus-Tages, sonst der Korpus-Gang)
   const tgTag = tagesDecke(I.datum), gangW = TAGE ? gangVoll(null) : null;      // Korpus-Gang (der Tag selbst ist an den Rändern zu unsicher)
-  const Wp = igcW(I, A.i0, A.i1, gangW, A.start.zeit), Wf = Wp ? Wp[0] : null;
-  if (Wf != null) { wSetzen(true, Wf); PILOT.W = Wf; PILOT.W_roh = Wp[1]; }
+  const Wp = igcW(I, A.i0, A.i1, gangW, A.start.zeit), Wflug = Wp ? Wp[0] : null;
+  const Wf = Wflug == null ? null : wTagVon(Wflug);            // der Flug misst den Piloten — der Regler will den Tag (Jörg 16.9.)
+  if (Wf != null) { wSetzen(true, Wf); PILOT.W = Wf; PILOT.W_flug = Wflug; PILOT.W_roh = Wp[1]; }
   // Decke des Tages: von einem Korpus-Tag die gemessene (P90 der Bart-Oberkanten aller Flüge, je Stunde); sonst die Modell-Decke aus W und
   // Monat mit Warnung — der Nutzer muss sie selbst eruieren und mit dem Basis-Regler einstellen (Jörg 15.9.). Der Regler steht auf 0 und verschiebt die Decke.
   const bs = null;
   let tg = tgTag;
   if (!tg) tg = modellDecke(WAN ? W_WERT : (PILOT.W != null ? PILOT.W : 1.0), +I.datum.slice(5, 7));
   DECKEL_PROFIL = tg ? tg.profil : null; DECKEL_INFO = tg; BASIS = 0;
-  const wq = Wf == null ? "" : (LANG === "de" ? ` · W des Piloten ${Wf.toFixed(1)} m/s (auf den Tagesgang normiert; roh ${Wp[1].toFixed(1)})` : ` · pilot's W ${Wf.toFixed(1)} m/s (normalised to the day's course; raw ${Wp[1].toFixed(1)})`);
+  const wq = Wf == null ? "" : (LANG === "de" ? ` · Tag W ${Wf.toFixed(1)} m/s, aus dem Flug gerechnet (der Flug steigt ${Wflug.toFixed(1)} m/s)` : ` · day W ${Wf.toFixed(1)} m/s, derived from the flight (the flight climbs ${Wflug.toFixed(1)} m/s)`);
   document.getElementById("bquelle").textContent = (!tg ? "" : tg.modell ? (LANG === "de" ? `Modell-Decke (W ${tg.W.toFixed(1)}, Monat ${tg.monat}): ${tg.text} — bitte prüfen` : `model ceiling (W ${tg.W.toFixed(1)}, month ${tg.monat}): ${tg.text} — please check`)
     : (LANG === "de" ? `Decke des Tages aus ${tg.n} Flügen: ${tg.text}` : `day's ceiling from ${tg.n} flights: ${tg.text}`)) + wq;
   deckelWarnung(tg && tg.modell ? tg : null);
