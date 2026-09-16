@@ -2161,10 +2161,18 @@ function verfeinere(r, ix0, ix1, iy0, iy1, PX, PY, R) {
 // ------------------------------------------------------------ Zeichenfläche
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
 const Ebene = L.Layer.extend({
-  onAdd(m) { this._c = L.DomUtil.create("canvas", "leaflet-zoom-hide"); this._c.style.pointerEvents = "none"; m.getPanes().overlayPane.appendChild(this._c); m.on("moveend zoomend resize", this.neu, this); this.neu(); },
-  onRemove(m) { L.DomUtil.remove(this._c); m.off("moveend zoomend resize", this.neu, this); },
+  onAdd(m) { this._c = L.DomUtil.create("canvas", ""); this._c.style.pointerEvents = "none"; m.getPanes().overlayPane.appendChild(this._c);
+    m.on("moveend zoomend resize", this.neu, this); m.on("zoom", this.mitzoomen, this); this.neu(); },
+  onRemove(m) { L.DomUtil.remove(this._c); m.off("moveend zoomend resize", this.neu, this); m.off("zoom", this.mitzoomen, this); },
+  // Während des Zoomens (zwei Finger, Rad) skaliert das Bild mit der Karte mit, statt stehen zu bleiben — sonst löst sich
+  // das Feld sichtbar von der Karte (Jörg 16.9.). Nach zoomend wird ohnehin frisch gezeichnet.
+  mitzoomen() { const c = this._c; if (!c || this._z0 == null) return;
+    const scale = map.getZoomScale(map.getZoom(), this._z0), p = map.latLngToLayerPoint(this._ll0);
+    L.DomUtil.setTransform(c, p, scale); },
   neu() { const s = map.getSize(), c = this._c; c.width = Math.round(s.x * dpr); c.height = Math.round(s.y * dpr); c.style.width = s.x + "px"; c.style.height = s.y + "px";
-    L.DomUtil.setPosition(c, map.containerPointToLayerPoint([0, 0])); const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, s.x, s.y); zeichne(g, s); }
+    this._z0 = map.getZoom(); this._ll0 = map.containerPointToLatLng([0, 0]);
+    L.DomUtil.setTransform(c, map.containerPointToLayerPoint([0, 0]), 1);
+    const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, s.x, s.y); zeichne(g, s); }
 });
 let sichtbareBaerte = [];
 const ebene = new Ebene().addTo(map);
@@ -3224,10 +3232,21 @@ for (const [id, k] of [["kfeld", "feld"], ["kbaerte", "baerte"], ["kluft", "luft
 const FOLGEN_ZOOM_MAX = 13;     // näher geht die Karte beim Folgen von sich aus nicht heran (Bild ~27 km breit)
 let folgenZoomDeckel = FOLGEN_ZOOM_MAX;   // zoomt der Nutzer von Hand, gilt sein Zoom als Grenze fürs Hineinzoomen; hinaus geht die Karte, sobald einer den Rand erreicht
 let folgenFaehrt = false;                 // die Karte ist gerade unterwegs (sanfte Fahrt) — bis «moveend» nichts Neues anstossen
+// Wer von Hand schiebt oder zoomt, soll nicht sofort zurückgerissen werden (Jörg 16.9.): das Folgen ruht, solange die Geste dauert,
+// und kehrt erst danach zurück — nach dem Loslassen von Finger oder Maus rasch, beim Mausrad drei Sekunden nach der letzten Drehung.
+let folgenBis = 0;
+map.on("dragstart", () => { if (!folgenFaehrt) folgenBis = Infinity; });
+map.on("dragend", () => { if (!folgenFaehrt) folgenBis = Date.now() + 1200; });
+map.on("zoomstart", () => { if (!folgenFaehrt) folgenBis = Infinity; });
+map.on("zoomend", () => { if (!folgenFaehrt) folgenBis = Date.now() + (zweiFinger ? 1200 : 3000); });
+let zweiFinger = false;
+map.getContainer().addEventListener("touchstart", e => { if (e.touches.length > 1) { zweiFinger = true; folgenBis = Infinity; } }, {passive: true});
+map.getContainer().addEventListener("touchend", e => { if (!e.touches.length && zweiFinger) { zweiFinger = false; folgenBis = Date.now() + 1200; } }, {passive: true});
+map.getContainer().addEventListener("wheel", () => { folgenBis = Date.now() + 3000; }, {passive: true});
 map.on("zoomend", () => { if (!folgenFaehrt) folgenZoomDeckel = map.getZoom(); });     // Zoom von Hand (Rad, Knöpfe): neue Grenze
 map.on("moveend", () => { folgenFaehrt = false; });
 function folgen(sofort) {
-  if (!an.folgen || (folgenFaehrt && !sofort)) return;
+  if (!an.folgen || (folgenFaehrt && !sofort) || (!sofort && Date.now() < folgenBis)) return;
   const zA = LAUF && LAUF.lauf ? zustandAvatar(LAUF.glatt || LAUF.lauf.pfad, uhr) : null;
   const zP = PILOT ? zustandPilot(uhr + ((LAUF ? LAUF.t0h : PILOT.t0h) - PILOT.t0h) * 3600) : null;
   const pts = [zA, zP].filter(z => z && isFinite(z.la) && isFinite(z.lo)).map(z => [z.la, z.lo]);
@@ -3258,8 +3277,10 @@ document.getElementById("kklapp").addEventListener("click", () => { const k = do
 for (const id of ["mzu", "mzu_en"]) document.getElementById(id).addEventListener("click", () => { document.getElementById("start").style.display = "none"; if (!PILOT && AUFGABEN.length && (!AUFG || AUFG.kennung !== AUFGABEN[0].kennung)) aufgabeWaehlen("a0"); });
 for (const id of ["st_igc_de", "st_igc_en"]) document.getElementById(id).addEventListener("click", () => document.getElementById("igcdatei").click());
 // Die Karte endet dort, wo die Steuerung beginnt — die wächst jetzt mit ihrem Inhalt (Jörg 16.9.: Statuszeile und Bilder unter der Quersicht)
+let steuerH = 0;
 function steuerHoehe() { const h = document.getElementById("steuer").offsetHeight;
-  document.documentElement.style.setProperty("--steuer", h + "px"); map.invalidateSize(); }
+  if (Math.abs(h - steuerH) < 1) return;                 // nur bei echter Änderung: sonst verwirft Leaflet laufend seine Kacheln
+  steuerH = h; document.documentElement.style.setProperty("--steuer", h + "px"); map.invalidateSize(); }
 new ResizeObserver(steuerHoehe).observe(document.getElementById("steuer"));
 window.addEventListener("resize", steuerHoehe);
 // Neustart (Jörg 16.9.): alles Laufende weg — Wiedergabe, Lauf, IGC, Decke — und die Einstiegskarte wieder zeigen
