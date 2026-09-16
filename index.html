@@ -719,6 +719,11 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
 #mcwas::after { content: ""; width: 5px; height: 5px; border-right: 1.3px solid currentColor; border-bottom: 1.3px solid currentColor; transform: rotate(-45deg); transition: transform .18s ease; margin-bottom: 1px; }
 #mcwas.auf::after { transform: rotate(45deg); margin-bottom: 3px; }
 #mctxt { margin: 3px 0 0; font-size: 11px; color: #6e6a61; line-height: 1.35; }
+#protzeig { border: none; background: none; padding: 0; font: inherit; font-size: 11px; color: #1d4f8f; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+#protzeig::after { content: ""; width: 5px; height: 5px; border-right: 1.3px solid currentColor; border-bottom: 1.3px solid currentColor; transform: rotate(-45deg); transition: transform .18s ease; margin-bottom: 1px; }
+#protzeig.auf::after { transform: rotate(45deg); margin-bottom: 3px; }
+#protokoll { margin: 6px 0 0; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6e6a61; white-space: pre-wrap; max-height: 220px; overflow: auto; background: #f4f3f0; border-radius: 6px; padding: 6px 8px; }
+#protokoll .kopfz { font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; color: #2b2a26; display: block; margin-bottom: 5px; }
 #vergleich #vg_anteil, #vergleich #vg_luft { height: 40px; }
 #legende span.l { display: inline-block; width: 22px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 4px; }
 #legende span.k { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
@@ -790,8 +795,10 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
 <div id="kopf" class="panel zu">
   <div class="kopfzeile">
     <button id="kklapp" aria-expanded="false" data-tt="tt_klapp" title="Einstellungen ein- und ausklappen"><span data-t="einst">Einstellungen</span><span class="chev"></span></button>
+    <button id="protzeig" data-t="prot" style="display:none">Protokoll</button>
     <button class="knopf gross" id="neustart" data-t="neu">Neustart</button>
   </div>
+  <pre id="protokoll" style="display:none"></pre>
   <div class="inhalt">
     <div class="gruppe">
       <div class="reihe"><span class="lab" data-t="aufgabe">Aufgabe</span><select id="aufgabe"></select><input type="file" id="igcdatei" accept=".igc,.IGC" style="display:none"></div>
@@ -865,8 +872,8 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
     <span id="info" class="neben"></span>
   </div>
   <div id="unten">
-    <div class="neben" id="status"></div>
-    <div class="neben" id="rechne" style="color:#123a8c"></div>
+    <div class="neben" id="status" style="display:none"></div>
+    <div class="neben" id="rechne" style="display:none"></div>
     <div class="neben" id="deckelwarnung" style="display:none;color:#7a4a00"></div>
     <div id="vergleich" style="display:none">
       <div class="vgz"><div class="neben klein" id="vg_t1"></div><canvas id="vg_anteil"></canvas></div>
@@ -1798,7 +1805,7 @@ const TXT = {
   de: {titel: "Wallis — Avatar", aufgabe: "Aufgabe", tag: "Tag", we: "Wochenende",
        feld: "Feld", baerte: "Bärte", luft: "Lufträume", relief: "Relief", wolke: "Wolke", folgen: "Folgen", fuell: "Auffüllung", sinken: "Sinkzone", l_sinkflaeche: "Sinkzone", koppel: "Feld und Bärte folgen dem Avatar", sub: "Submarine-Style", schirm: "Schirm", tag: "Tag", gurt: "Gurtzeug", w_lab: "Thermik W", w_erkl: "W = Tagesstärke der Thermik (Median des Steigens im Kreisen, m/s)", gurt_titel: "Gurtzeug", gurt_frage: "Fliegt dieser Pilot ein Submarine-Style-Gurtzeug (Submarine, Sublite …)?", ja: "ja", nein: "nein", gurt_hilf: "Steht in keiner IGC. Ändert die Polare mit der Geschwindigkeit (bei 45 km/h rund 0,07 m/s weniger Sinken, wie am Enzo 3 gemessen). Danach startet der Avatar; die Wahl steht in den Einstellungen unter «Gurtzeug».",
        l_avatar: "Avatar", l_pilot: "Pilot", l_bart: "Bart-Zelle", l_zu: "gesperrt",
-       info: "Erklärung", stand: "Stand", lade: "lade …", los: "Demo-Route ansehen", ohne: "Keine IGC?", ohne_hilf: "— Start, drei Wendepunkte und Landung stehen schon auf der Karte; zieh sie mit der Maus dorthin, wo Du fliegen willst.", einst: "Einstellungen", neu: "Neustart",
+       info: "Erklärung", stand: "Stand", lade: "lade …", los: "Demo-Route ansehen", ohne: "Keine IGC?", ohne_hilf: "— Start, drei Wendepunkte und Landung stehen schon auf der Karte; zieh sie mit der Maus dorthin, wo Du fliegen willst.", einst: "Einstellungen", neu: "Neustart", prot: "Protokoll", rechnet_kurz: "Rechnung läuft …",
        e_hilf: "Punkte per Klick auf die Karte setzen — der Reihe nach. Der Avatar startet am Boden.", e_start: "Start", e_wp: "Wendepunkt", e_leit: "Leitpunkt", e_ziel: "Ziel", e_zeit: "Start", e_rund: "Ziel = Start", e_zurueck: "Zurück", e_leer: "Löschen", e_rechnen: "Rechnen",
        igc: "IGC laden …", eigen: "Eigene Aufgabe", w_alle: "alle Tage", basis: "Basis", b_typisch: "typisch", f_luft: "Luft", f_leer: "kein Feld", b_titel: "Bart-Zelle", b_n: "Bärte", b_anteil: "Anteil der Durchflüge", b_verkehr: "durchgleitende Flüge", b_steig: "Steigen", b_hoehe: "Einstieg → Oberkante (P25 → typischer Tag)", b_block: "Zeitblock", alle: "alle",
        gleitet: "gleitet", kurbelt: "kurbelt", wartet: "wartet", prueft: "prüft (steht)", ug: "ü.G.", angekommen: "angekommen", gelandet: "gelandet", start: "Start",
@@ -1809,7 +1816,7 @@ const TXT = {
   en: {titel: "Valais — avatar", aufgabe: "Task", tag: "Day", we: "Weekend",
        feld: "Field", baerte: "Thermals", luft: "Airspace", relief: "Relief", wolke: "Cloud", folgen: "Follow", fuell: "Fill-in", sinken: "Sink zone", l_sinkflaeche: "sink zone", koppel: "Field and thermals follow the avatar", sub: "Submarine-style", schirm: "Glider", tag: "Day", gurt: "Harness", w_lab: "Thermals W", w_erkl: "W = the day's thermal strength (median climb rate while circling, m/s)", gurt_titel: "Harness", gurt_frage: "Does this pilot fly a submarine-style harness (Submarine, Sublite …)?", ja: "yes", nein: "no", gurt_hilf: "No IGC records it. It changes the polar with speed (about 0.07 m/s less sink at 45 km/h, as measured on the Enzo 3). The avatar starts afterwards; the choice is kept in the settings under “Harness”.",
        l_avatar: "Avatar", l_pilot: "Pilot", l_bart: "thermal cell", l_zu: "closed",
-       info: "About", stand: "Data as of", lade: "loading …", los: "See the demo route", ohne: "No IGC?", ohne_hilf: "— launch, three turnpoints and landing are already on the map; drag them where you want to fly.", einst: "Settings", neu: "Restart",
+       info: "About", stand: "Data as of", lade: "loading …", los: "See the demo route", ohne: "No IGC?", ohne_hilf: "— launch, three turnpoints and landing are already on the map; drag them where you want to fly.", einst: "Settings", neu: "Restart", prot: "Log", rechnet_kurz: "computing …",
        e_hilf: "Set points by clicking on the map — in order. The avatar starts on the ground.", e_start: "Start", e_wp: "Turnpoint", e_leit: "Guide point", e_ziel: "Goal", e_zeit: "Start", e_rund: "Goal = start", e_zurueck: "Undo", e_leer: "Clear", e_rechnen: "Compute",
        igc: "Load IGC …", eigen: "Own task", w_alle: "all days", basis: "Base", b_typisch: "typical", f_luft: "Air", f_leer: "no field", b_titel: "Thermal cell", b_n: "climbs", b_anteil: "share of passing flights", b_verkehr: "flights gliding through", b_steig: "climb rate", b_hoehe: "entry → top (P25 → typical day)", b_block: "time block", alle: "all",
        gleitet: "gliding", kurbelt: "climbing", wartet: "waiting", prueft: "probing (dead)", ug: "AGL", angekommen: "arrived", gelandet: "landed", start: "start",
@@ -2750,7 +2757,7 @@ function workerStart() {
   worker.onmessage = ev => {
     const m = ev.data;
     if (m.art === "bereit") { workerBereit = true; if (rechnung) rechnung(); }
-    else if (m.art === "stand") { document.getElementById("rechne").textContent = t("rechnet") + " " + m.text; rechnungAn(m.text); }
+    else if (m.art === "stand") { PROTOKOLL.push([Date.now(), m.text]); rechnungAn(m.text); }
     else if (m.art === "fehler") { document.getElementById("rechne").textContent = "Fehler: " + m.text; console.error(m.text); workerFrei(); }
     else if (m.art === "fertig") { ergebnis(m); }
     else if (m.art === "abhier") { rechnungAus(); ABHIER = m; ABHIER.t0h = LAUF ? LAUF.t0h : PILOT.t0h; if (m.lauf && m.ok) m.lauf.pfad = landungAnhaengen(m.lauf.pfad); if (m.lauf) { ABHIER.glatt = glaetten(m.lauf.pfad); ABHIER.spur = spurMitKreisen(ABHIER.glatt); } document.getElementById("rechne").textContent = m.ok ? `${t("abhier_erg")}: ${m.angekommen} / ${m.muster} ${t("st_laeufen")} ${(m.median_s / 60).toFixed(0)} min, ${t("st_gezeigt")} ${(m.lauf.t / 60).toFixed(0)} min` : t("abhier_kein") + (m.lauf ? (LANG === "de" ? ` — gezeigt: der weiteste (bis km ${m.weit_km})` : ` — shown: the furthest (to km ${m.weit_km})`) : ""); zeichneAlles(); }
@@ -2768,6 +2775,25 @@ const GRUND_EN = {"abgesoffen": "sank out", "abgesoffen beim Soaren": "sank out 
   "kein Weg weiter": "no way on", "zu tief, gelandet": "too low, landed", "Wegpunkt verfehlt": "turnpoint missed", "Ziel verfehlt": "goal missed",
   "Fehlversuch unter Grund": "failed attempt below ground", "Luftraum unterwegs": "airspace on the way", "kein offener Zustand": "no open state", "keine Aufgabe": "no task"};
 function grText(g) { return LANG === "en" && g && GRUND_EN[g] ? GRUND_EN[g] : (g || ""); }
+// Protokoll der Rechnung (Jörg 16.9.): unten steht nur «Rechnung läuft», die Meldungen sammeln sich hier und sind über den Link zu sehen
+let PROTOKOLL = [];
+function protokollZeigen() {                 // Kopfzeile (das Ergebnis) und darunter die Meldungen der Rechnung
+  const e = document.getElementById("protokoll"); if (!e) return;
+  const kopf = document.getElementById("status").textContent;
+  const t0 = PROTOKOLL.length ? PROTOKOLL[0][0] : 0;
+  e.innerHTML = (kopf ? `<span class="kopfz"></span>` : "") +
+    PROTOKOLL.map(([t, x]) => ((t - t0) / 1000).toFixed(1).padStart(5) + " s  " + x).join("\n");
+  if (kopf) e.querySelector(".kopfz").textContent = kopf;
+  document.getElementById("protzeig").style.display = (kopf || PROTOKOLL.length) ? "" : "none";
+}
+function protokollLeeren() { PROTOKOLL = []; const k = document.getElementById("protzeig");
+  document.getElementById("protokoll").textContent = ""; k.style.display = "none"; k.classList.remove("auf");
+  document.getElementById("protokoll").style.display = "none"; }
+function protokollZeile(txt) { if (!PROTOKOLL.length) PROTOKOLL.push([Date.now(), txt]); else PROTOKOLL.push([Date.now(), txt]); protokollZeigen(); }
+document.getElementById("protzeig").addEventListener("click", () => {
+  const k = document.getElementById("protzeig"), e = document.getElementById("protokoll");
+  e.style.display = k.classList.toggle("auf") ? "" : "none";
+});
 function rechnungAn(detail) {
   const b = document.getElementById("banner");
   b.innerHTML = (LANG === "de" ? "Moment — Berechnung läuft …" : "One moment — computing …") + (detail ? `<span class="neben">${detail}</span>` : `<span class="neben">${LANG === "de" ? "100 Läufe des Avatars; bei 300 km bis 20 s" : "100 avatar runs; up to 20 s for 300 km"}</span>`);
@@ -2776,7 +2802,7 @@ function rechnungAn(detail) {
 function rechnungAus() { document.getElementById("banner").style.display = "none"; }
 async function avatarRechnen() {
   if (!AUFG) return;
-  const wk = wkVon(W_SEL); document.getElementById("rechne").textContent = t("rechnet"); rechnungAn();
+  const wk = wkVon(W_SEL); protokollLeeren(); rechnungAn();
   const bufs = await Promise.all(META.stunden.map(H => lade(H, wk)));
   const key = W_SEL === "alle" ? "alle" : (+W_SEL).toFixed(1);
   if (!START_MANUELL) STARTZEIT = startVorgabe();                    // Basis der Startwahl ist immer die Vorgabe (typisch für W, früh wenn lang) — nicht die letzte Wahl
@@ -2807,6 +2833,7 @@ function ergebnis(m) {
   if (autoStart && m.lauf) { autoStart = false; folgenZoomDeckel = FOLGEN_ZOOM_MAX; folgen(true); abspielen(); }
 }
 function statusText() {
+  setTimeout(protokollZeigen, 0);              // das Ergebnis steht im Protokoll, nicht mehr unter der Quersicht (Jörg 16.9.)
   const s = document.getElementById("status");
   if (!LAUF) { s.textContent = AUFG ? "" : ""; return; }
   const m = LAUF, igc = PILOT && PILOT.datei ? `${PILOT.datei} · ` : "";      // welche IGC gilt, steht vorne
@@ -3240,7 +3267,7 @@ document.getElementById("neustart").addEventListener("click", () => {
   anhalten(); AUFG = null; LAUF = null; KORR = null; PILOT = null; ABHIER = null; DECKEL_PROFIL = null; DECKEL_INFO = null;
   uhr = 0; START_MANUELL = false; STARTZEIT = startTypisch(WAN ? W_WERT : null);
   document.getElementById("bquelle").textContent = ""; document.getElementById("status").textContent = "";
-  document.getElementById("rechne").textContent = ""; deckelWarnung(null);
+  document.getElementById("rechne").textContent = ""; protokollLeeren(); deckelWarnung(null);
   document.getElementById("eigene").classList.remove("an");
   startAnzeigen(); aufgabenListe(); statusText(); vgBauen(); punktMarker(); zeichneAlles();
   document.getElementById("start").style.display = "flex";
