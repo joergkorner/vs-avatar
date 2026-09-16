@@ -716,8 +716,6 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
 #vergleich .vgkopf .neben.klein { margin-bottom: 0; }
 #vergleich .vgkopf #vg_t3 { flex: 1; min-width: 0; }
 #mcwas { flex: none; border: none; background: none; padding: 0; font: inherit; font-size: 11px; color: #1d4f8f; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-#mcwas::after { content: ""; width: 5px; height: 5px; border-right: 1.3px solid currentColor; border-bottom: 1.3px solid currentColor; transform: rotate(-45deg); transition: transform .18s ease; margin-bottom: 1px; }
-#mcwas.auf::after { transform: rotate(45deg); margin-bottom: 3px; }
 #mctxt { margin: 3px 0 0; font-size: 11px; color: #6e6a61; line-height: 1.35; }
 #protzeig { border: none; background: none; padding: 0; font: inherit; font-size: 11px; color: #1d4f8f; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 #protzeig::after { content: ""; width: 5px; height: 5px; border-right: 1.3px solid currentColor; border-bottom: 1.3px solid currentColor; transform: rotate(-45deg); transition: transform .18s ease; margin-bottom: 1px; }
@@ -2161,7 +2159,8 @@ function verfeinere(r, ix0, ix1, iy0, iy1, PX, PY, R) {
 // ------------------------------------------------------------ Zeichenfläche
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
 const Ebene = L.Layer.extend({
-  onAdd(m) { this._c = L.DomUtil.create("canvas", ""); this._c.style.pointerEvents = "none"; m.getPanes().overlayPane.appendChild(this._c);
+  // transformOrigin 0 0: sonst skaliert das Bild beim Zoomen um seine Mitte und läuft aus der Karte
+  onAdd(m) { this._c = L.DomUtil.create("canvas", ""); this._c.style.pointerEvents = "none"; this._c.style.transformOrigin = "0 0"; m.getPanes().overlayPane.appendChild(this._c);
     m.on("moveend zoomend resize", this.neu, this); m.on("zoom", this.mitzoomen, this); this.neu(); },
   onRemove(m) { L.DomUtil.remove(this._c); m.off("moveend zoomend resize", this.neu, this); m.off("zoom", this.mitzoomen, this); },
   // Während des Zoomens (zwei Finger, Rad) skaliert das Bild mit der Karte mit, statt stehen zu bleiben — sonst löst sich
@@ -2619,7 +2618,7 @@ function vgZeichnen(tt, sofort) {
     // Gesamtabweichung (Sekunden-gewichteter Median über alle Luftklassen) in der Überschrift
     const ges = S => { let tot = 0; const K = new Float32Array(50); for (let bw = 0; bw < 17; bw++) for (let k = 0; k < 50; k++) { K[k] += S.LW[bw * 50 + k]; tot += S.LW[bw * 50 + k]; } if (tot < 60) return null; let c = 0; for (let k = 0; k < 50; k++) { if (c + K[k] >= tot / 2) return -50 + 2 * k + 2 * (tot / 2 - c) / K[k]; c += K[k]; } return null; };
     const gp = ges(SP), ga = ges(SA); const fmt = v => v == null ? "–" : (Math.abs(v) < 0.5 ? "0" : (v > 0 ? "+" : "−") + Math.abs(v).toFixed(0)) + " %";
-    document.getElementById("vg_t3").textContent = `${t("pilot")} ${fmt(gp)} ${t("st_avatar")} ${fmt(ga)}`; }
+    document.getElementById("vg_t3").textContent = [[t("pilot"), gp], [t("st_avatar"), ga]].filter(([, v]) => v != null).map(([n, v]) => n + " " + fmt(v)).join(" "); }
   // (Bild 4 «Steigen nach Stunde» am 15.9.2026 spät entfernt — Jörg: «das brauchen wir nicht»)
 }
 function zeichneMarker(g) {
