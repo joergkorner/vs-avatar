@@ -2278,13 +2278,19 @@ function blockIndex(st) { const bl = META.bloecke; if (st < bl[0][0]) return 0; 
 function zeichneBaerte(g, s, PX, PY) {
   const h = anzeige.h, st = anzeige.t, B = BAERTE, n = B.cx.length, sti = Math.round(st) - ST0, z = map.getZoom();
   const nMin = z >= 12 ? 0 : z >= 11 ? 12 : z >= 10 ? 30 : 60; const bk = blockIndex(st);
+  const zellPx = Math.abs(PX[1] - PX[0]) || 8;                       // wie breit eine 500-m-Zelle gerade ist
+  const rmax = Math.max(2.0, Math.min(10, zellPx * 0.8)), deck = rmax >= 7 ? 1 : rmax >= 4 ? 0.8 : 0.6;
   if (st >= BART_BIS) return;                                                                // Abend: kein Bart mehr
   for (let i = 0; i < n; i++) {
     if (B.n[i] < nMin) continue; const x = PX[B.cx[i]], y = PY[B.cy[i]]; if (x < -30 || x > s.x + 30 || y < -30 || y > s.y + 30) continue;
     let rate = B.rate[i], nn = B.n[i];
     if (an.koppel) { if (h < B.h0[i] - 200 || h > B.ob[i] + 200) continue; const hi = B.hist[i]; let k = 0; for (let j = Math.max(0, sti - 1); j <= Math.min(hi.length - 1, sti + 1); j++) k += hi[j]; if (k < 3) continue; rate = rate * k / nn; nn = k; }
-    const rad = 3 + 7 * Math.min(rate / 0.8, 1);
-    g.fillStyle = bartFarbe(rate); g.strokeStyle = "rgba(90,50,10,.6)"; g.lineWidth = 0.8; g.beginPath(); g.arc(x, y, rad, 0, 2 * Math.PI); g.fill(); g.stroke();
+    // Grösse und Deckkraft folgen dem Zoom (Jörg 16.9.): weit draussen sind die 500-m-Zellen nur wenige Pixel breit —
+    // Kreise in voller Grösse decken dort das Feld zu. Kleine Kreise bekommen auch keinen Rand mehr.
+    const rad = Math.max(1.4, (3 + 7 * Math.min(rate / 0.8, 1)) * (rmax / 10));
+    g.fillStyle = bartFarbe(rate); g.globalAlpha = deck; g.beginPath(); g.arc(x, y, rad, 0, 2 * Math.PI); g.fill();
+    if (rmax >= 5) { g.strokeStyle = "rgba(90,50,10,.6)"; g.lineWidth = 0.8; g.stroke(); }
+    g.globalAlpha = 1;
     sichtbareBaerte.push([x, y, i, rate, nn, bk]);
   }
 }
