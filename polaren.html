@@ -96,7 +96,10 @@ const TXT = {
     achse_s: "m/s"
   }
 };
-let LANG = "de";
+// Sprache aus dem Browser (Jörg 16.9.): Deutsch nur, wenn der Browser Deutsch führt — sonst Englisch
+const SPR = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "de"])
+  .some(x => /^de\b|^de-/i.test(String(x))) ? "de" : "en";
+let LANG = SPR;
 const t = k => TXT[LANG][k];
 
 const FARBEN = ["#2a78d6", "#c8321e", "#7a3f9a", "#e09b1a", "#4a4640", "#7aa6dd", "#8a5a2b"];

@@ -1823,7 +1823,10 @@ const TXT = {
        abhier_erg: "from here", abhier_kein: "from here no run arrives", igc_start: "avatar flies along — at the typical start time for this W", igc_kein: "The track is not inside the Valais field or too short.", pilot: "Pilot",
        k1: "measured", k2: "widened (class 2)", k3: "terrain estimate (class 3)", k4: "thinly flown (class 4: only a few flights)"}
 };
-let LANG = "de";
+// Sprache aus dem Browser (Jörg 16.9.): Deutsch nur, wenn der Browser Deutsch führt — sonst Englisch. Die Knöpfe DE|EN bleiben.
+function sprachWunsch() { const L = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "de"];
+  return L.some(x => /^de\b|^de-/i.test(String(x))) ? "de" : "en"; }
+let LANG = sprachWunsch();
 function t(k) { return TXT[LANG][k] !== undefined ? TXT[LANG][k] : k; }
 function sprache(l) {
   LANG = l;
@@ -3330,6 +3333,7 @@ document.getElementById("stzu").addEventListener("click", startZu);
 document.getElementById("start").addEventListener("click", e => { if (e.target.id === "start") startZu(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && document.getElementById("start").style.display !== "none") startZu(); });
 document.getElementById("st_sde").addEventListener("click", () => sprache("de")); document.getElementById("st_sen").addEventListener("click", () => sprache("en"));
+sprache(LANG);                          // gleich beim Start anwenden
 document.getElementById("bzu").addEventListener("click", () => { document.getElementById("bartinfo").style.display = "none"; });
 window.addEventListener("resize", () => { zeichneProfil(); });
 // Querschnitt in der Höhe ziehen (Griff am oberen Rand der Leiste); die Karte passt sich an
