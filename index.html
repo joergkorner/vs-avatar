@@ -2495,13 +2495,35 @@ function polSinken(v, h) { const p = polareAktiv(), f = dichte(h), vt = Math.max
 // Sollfahrt der Polare für Luft w (m/s) bei erwartetem Steigen m: kleinste (m + Sinken − w) / v über 30 km/h bis Höchstfahrt (nur Bezugslinie im Bild)
 function sollfahrt(w, m) { let bv = 30, bc = Infinity; const mx = vmaxVon(SCHIRM); for (let v = 30; v <= mx + 1e-9; v += 0.5) { const c = (m + polSinken(v, 2000) - w) / v; if (c < bc) { bc = c; bv = v; } } return bv; }
 let VG = {pilot: null, avatar: null, t: null, wann: 0, soll: 0, timer: null};
+// Kreisen erkennen (Jörg 16.9.): nicht die Momentandrehrate — die fällt beim Einfliegen und beim Ausleiern der Kreise unter jede
+// Schwelle —, sondern wie weit sich der Kurs über ein Fenster von 40 s dreht, dazu der Umweg (Weg durch Luftlinie). Gemessen am
+// OPR-Flug 25.5.2026 am Furka: die alte Regel (5°/s über 6 s) zählte 11:06 (347°, +0.97 m/s) und 11:10 (391°, +1.80 m/s) als Gleiten.
+const KREIS_FENSTER = 40, KREIS_GRAD = 200, KREIS_UMWEG = 1.6, KREIS_WEG_MIN = 120;
+function kreisMaske(P, i0, i1) {
+  const m = new Uint8Array(P.length); if (i1 - i0 < 6) return m;
+  const dK = new Float64Array(P.length + 1), dS = new Float64Array(P.length + 1);
+  const kurs = i => Math.atan2((P[i + 1][2] - P[i][2]) * KX, (P[i + 1][1] - P[i][1]) * KY);
+  for (let i = i0 + 1; i < i1; i++) {
+    let d = kurs(i) - kurs(i - 1); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    dK[i] = Math.abs(d);
+    dS[i] = Math.hypot((P[i + 1][1] - P[i][1]) * KY, (P[i + 1][2] - P[i][2]) * KX);
+  }
+  const sK = new Float64Array(P.length + 2), sS = new Float64Array(P.length + 2);
+  for (let i = i0; i <= i1; i++) { sK[i + 1] = sK[i] + dK[i]; sS[i + 1] = sS[i] + dS[i]; }
+  let a = i0, b = i0;
+  for (let k = i0; k <= i1; k++) {
+    while (a < k && P[k][0] - P[a][0] > KREIS_FENSTER / 2) a++;
+    while (b < i1 && P[b][0] - P[k][0] < KREIS_FENSTER / 2) b++;
+    const grad = (sK[b] - sK[a]) * 180 / Math.PI, weg = sS[b] - sS[a];
+    const netto = Math.hypot((P[b][1] - P[a][1]) * KY, (P[b][2] - P[a][2]) * KX);
+    if (grad > KREIS_GRAD || (weg > KREIS_WEG_MIN && weg > KREIS_UMWEG * netto)) m[k] = 1;
+  }
+  return m;
+}
 function vgPilot() {
   const P = PILOT.p, n = P.length; if (n < 20) return null;
   const i1 = PILOT.i1 != null ? Math.min(PILOT.i1, n - 1) : n - 1;       // Zeiten sind relativ zum Abflug (0 s); i1 = Landung
-  const kurs = k => { const a = P[k], b = P[Math.min(k + 3, n - 1)]; return Math.atan2((b[2] - a[2]) * KX, (b[1] - a[1]) * KY); };
-  const dreht = new Uint8Array(n); let letzt = -1e9;
-  for (let k = 3; k < n; k++) { let dk = kurs(k) - kurs(k - 3); while (dk > Math.PI) dk -= 2 * Math.PI; while (dk < -Math.PI) dk += 2 * Math.PI;
-    const dt = Math.max(P[k][0] - P[k - 3][0], 1); if (Math.abs(dk) * 180 / Math.PI / dt > 5) letzt = P[k][0]; if (P[k][0] - letzt <= 8) dreht[k] = 1; }
+  const dreht = kreisMaske(P, 0, i1);
   const t = [], dt = [], va = [], up = [], wl = [];
   for (let k = 0; k < i1; k++) {
     if (P[k][0] < 0 || dreht[k]) continue;
@@ -3059,28 +3081,23 @@ function igcW(I, i0, i1, gang, t0h) {
   // Ohne Gang (gang null) das rohe Steigen. Rückgabe [W, W_roh].
   const P = I.pts; const raten = [], mitte = [], roh = []; const tAnf = P[i0][0];
   const idx = []; for (let i = i0; i <= i1; i++) idx.push(i);          // Punkte sind auf 2 s ausgedünnt
-  const kurs = k => { const a = P[idx[k]], b = P[idx[Math.min(k + 3, idx.length - 1)]]; return Math.atan2((b[2] - a[2]) * KX, (b[1] - a[1]) * KY); };
-  let start = -1, letztDreh = -1;
-  for (let k = 3; k < idx.length - 3; k++) {
-    let dk = kurs(k) - kurs(k - 3); while (dk > Math.PI) dk -= 2 * Math.PI; while (dk < -Math.PI) dk += 2 * Math.PI;
-    const dt = Math.max(P[idx[k]][0] - P[idx[k - 3]][0], 1), rate = Math.abs(dk) * 180 / Math.PI / dt;
-    const tk = P[idx[k]][0];
-    if (rate > 5) { if (start < 0) start = k; letztDreh = tk; }
-    else if (start >= 0 && tk - letztDreh > 8) { const a = P[idx[start]], b = P[idx[k]]; if (b[0] - a[0] >= 60) { const r = (b[3] - a[3]) / (b[0] - a[0]); roh.push(r);
+  const kreis = kreisMaske(P, i0, i1);                      // dieselbe Erkennung wie in den Bildern (Jörg 16.9.)
+  let start = -1;
+  for (let i = i0; i <= i1; i++) {
+    if (kreis[i]) { if (start < 0) start = i; continue; }
+    if (start >= 0) { const a = P[start], b = P[i]; if (b[0] - a[0] >= 60) { const r = (b[3] - a[3]) / (b[0] - a[0]); roh.push(r);
         const h = t0h != null ? t0h + (0.5 * (a[0] + b[0]) - tAnf) / 3600 : null, rn = gang && h != null ? r / Math.max(0.5, gangBei(gang, h)) : r; raten.push(rn); if (h != null && h >= 10 && h < 17) mitte.push(rn); } start = -1; }
   }
   if (!raten.length) return null; const R = mitte.length >= 5 ? mitte : raten; R.sort((x, y) => x - y); roh.sort((x, y) => x - y); return [R[Math.floor(R.length / 2)], roh[Math.floor(roh.length / 2)]];
 }
 function igcKreise(I, i0, i1) {
   // Kreisabschnitte >= 60 s mit >= 100 m Gewinn: Ort, Uhrzeit (Ortszeit) und Höhe am Ende
-  const P = I.pts, out = []; const idx = []; for (let i = i0; i <= i1; i++) idx.push(i);
-  const kurs = k => { const a = P[idx[k]], b = P[idx[Math.min(k + 3, idx.length - 1)]]; return Math.atan2((b[2] - a[2]) * KX, (b[1] - a[1]) * KY); };
-  let start = -1, letztDreh = -1;
-  for (let k = 3; k < idx.length - 3; k++) {
-    let dk = kurs(k) - kurs(k - 3); while (dk > Math.PI) dk -= 2 * Math.PI; while (dk < -Math.PI) dk += 2 * Math.PI;
-    const dt = Math.max(P[idx[k]][0] - P[idx[k - 3]][0], 1), rate = Math.abs(dk) * 180 / Math.PI / dt, tk = P[idx[k]][0];
-    if (rate > 5) { if (start < 0) start = k; letztDreh = tk; }
-    else if (start >= 0 && tk - letztDreh > 8) { const a = P[idx[start]], b = P[idx[k]]; if (b[0] - a[0] >= 60 && b[3] - a[3] >= 100) out.push({la: b[1], lo: b[2], h: b[3], t: b[0] / 3600 + I.utcOff}); start = -1; }
+  const P = I.pts, out = [];
+  const kreis = kreisMaske(P, i0, i1);
+  let start = -1;
+  for (let i = i0; i <= i1; i++) {
+    if (kreis[i]) { if (start < 0) start = i; continue; }
+    if (start >= 0) { const a = P[start], b = P[i]; if (b[0] - a[0] >= 60 && b[3] - a[3] >= 100) out.push({la: b[1], lo: b[2], h: b[3], t: b[0] / 3600 + I.utcOff}); start = -1; }
   }
   return out;
 }
