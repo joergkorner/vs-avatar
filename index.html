@@ -2179,6 +2179,7 @@ const Ebene = L.Layer.extend({
     L.DomUtil.setTransform(c, map.containerPointToLayerPoint([0, 0]), 1);
     const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, s.x, s.y); zeichne(g, s); }
 });
+const LABEL_GITTER = 150;                 // Abstand der Beschriftungs-Anker in Bildpunkten
 let sichtbareBaerte = [];
 const ebene = new Ebene().addTo(map);
 function cp(la, lo) { return map.latLngToContainerPoint([la, lo]); }
@@ -2197,13 +2198,20 @@ function zeichne(g, s) {
   if (an.feld) {
     const KL = rasterKlasse(); const pfade = {1: {}, 2: {}, 3: {}, 4: {}}; const labels = []; const zaehler = {};
     const R = map.getZoom() >= 12.5 ? 4 : map.getZoom() >= 10.5 ? 3 : 2;
+    const anker = new Set();
     const V = verfeinere(r, ix0, ix1, iy0, iy1, PX, PY, R);
     if (an.sinken) zeichneSinken(g, V);
     isolinien(V.r, V.W, 0, V.W - 1, 0, V.H - 1, V.PX, V.PY, (k, x1, y1, x2, y2, ixf, iyf) => {
       const gx = Math.min(ix0 + Math.floor(ixf / R), NX - 2), gy = Math.min(iy0 + Math.floor(iyf / R), NY - 2);
       const cl = Math.max(KL[gy * NX + gx], KL[gy * NX + gx + 1], KL[(gy + 1) * NX + gx], KL[(gy + 1) * NX + gx + 1]) || 1;
       (pfade[cl][k] = pfade[cl][k] || []).push(x1, y1, x2, y2); zaehler[k] = (zaehler[k] || 0) + 1;
-      if (cl === 1 && zaehler[k] % (60 * R) === 30) labels.push([k, (x1 + x2) / 2, (y1 + y2) / 2]);
+      // Beschriftung an ortsfeste Anker binden (Jörg 16.9.): früher entschied ein Zähler über die Segmente, wo eine Zahl steht —
+      // beim Abspielen ändert sich das Feld leicht, die Zählung verschiebt sich und die Zahlen flackerten über den Schirm.
+      // Jetzt steht eine Zahl nur da, wo eine Linie ein festes Gitter kreuzt; der Platz bleibt, solange die Linie dort bleibt.
+      if (cl === 1) { const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        const ax = Math.round(mx / LABEL_GITTER), ay = Math.round(my / LABEL_GITTER);
+        if (Math.abs(mx - ax * LABEL_GITTER) < 3 && Math.abs(my - ay * LABEL_GITTER) < 3) {
+          const schl = ax + "," + ay; if (!anker.has(schl)) { anker.add(schl); labels.push([k, ax * LABEL_GITTER, ay * LABEL_GITTER]); } } }
     });
     g.lineJoin = "round"; g.lineCap = "round";
     for (const cl of [4, 3, 2, 1]) for (const kk in pfade[cl]) {
@@ -2214,8 +2222,9 @@ function zeichne(g, s) {
       g.beginPath(); for (let i = 0; i < p.length; i += 4) { g.moveTo(p[i], p[i + 1]); g.lineTo(p[i + 2], p[i + 3]); } g.stroke();
     }
     g.setLineDash([]);
+    // Die Zahlen stehen nur im Stillstand (Jörg 16.9.): beim Abspielen ändert sich das Feld ständig, und sie flackerten.
     g.font = "10px -apple-system, Helvetica, Arial"; g.textAlign = "center"; g.textBaseline = "middle";
-    for (const [k, x, y] of labels) { const c = k * STUFE, s_ = (c > 0 ? "+" : "") + c.toFixed(1); g.lineWidth = 3; g.strokeStyle = "rgba(255,255,255,.9)"; g.strokeText(s_, x, y); g.fillStyle = k > 0 ? "#123a8c" : k < 0 ? "#2b2a26" : "#6e6a61"; g.fillText(s_, x, y); }
+    for (const [k, x, y] of (spiel ? [] : labels)) { const c = k * STUFE, s_ = (c > 0 ? "+" : "") + c.toFixed(1); g.lineWidth = 3; g.strokeStyle = "rgba(255,255,255,.9)"; g.strokeText(s_, x, y); g.fillStyle = k > 0 ? "#123a8c" : k < 0 ? "#2b2a26" : "#6e6a61"; g.fillText(s_, x, y); }
   }
   sichtbareBaerte = [];
   if (an.baerte && BAERTE) zeichneBaerte(g, s, PX, PY);
