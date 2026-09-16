@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polaren — Wallis</title>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 18px 20px 40px; background: #fcfcfb; color: #2b2a26;
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.kopf { max-width: 1180px; margin: 0 auto 14px; position: relative; }
+h1 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+.neben { color: #6e6a61; font-size: 12px; }
+.sprache { position: absolute; right: 0; top: 2px; }
+.sprache button { border: none; background: none; cursor: pointer; font-size: 13px; color: #6e6a61; padding: 2px 4px; }
+.sprache button.an { color: #123a8c; font-weight: 600; }
+.pop { margin-top: 6px; }
+.pop b { color: #2b2a26; font-weight: 600; }
+.legende { margin-top: 5px; padding-top: 5px; border-top: 1px solid #ebe9e4; }
+.legende b { color: #2b2a26; font-weight: 600; }
+.zurueck { color: #1d4f8f; text-decoration: none; font-size: 12px; }
+.zurueck:hover { text-decoration: underline; }
+.gitter { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.kachel { background: #fff; border: 1px solid #e6e4df; border-radius: 10px; padding: 10px 12px 9px; }
+.kachel h2 { font-size: 14px; margin: 0 0 2px; font-weight: 600; text-transform: capitalize; }
+.gross h2 { text-transform: none; }
+.kachel canvas { display: block; width: 100%; height: 190px; margin: 2px 0 4px; }
+.werte { font-size: 11px; color: #6e6a61; line-height: 1.4; }
+.werte b { color: #2b2a26; font-weight: 600; }
+.werte table { border-collapse: collapse; width: 100%; margin-top: 2px; }
+.werte td { padding: 1px 0; vertical-align: top; }
+.werte td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 8px; }
+.gross { grid-column: 1 / -1; }
+.gross canvas { height: 300px; }
+.gross .zweispalt { display: flex; gap: 18px; flex-wrap: wrap; }
+.gross .zweispalt > div { flex: 1; min-width: 260px; }
+.fuss { max-width: 1180px; margin: 18px auto 0; }
+@media (max-width: 640px) { body { padding: 14px 14px 30px; } .gitter { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="kopf">
+  <div class="sprache"><button id="sde" class="an">DE</button> | <button id="sen">EN</button></div>
+  <h1 id="h_titel">Polaren der Schirme</h1>
+  <div class="neben" id="h_unter"></div>
+  <div class="neben pop" id="h_pop"></div>
+  <div class="neben legende" id="h_legende"></div>
+  <div style="margin-top:6px"><a class="zurueck" href="index.html" id="h_zurueck">← zurück zum Player</a></div>
+</div>
+<div class="gitter" id="gitter"></div>
+<div class="fuss neben" id="h_fuss"></div>
+
+<script>
+const TXT = {
+  de: {
+    titel: "Polaren der Schirme",
+    unter: n => `${n} Schirmtypen aus dem Wallis-Korpus, je aus den Gleitstücken aller Flüge dieses Typs gemessen. Sinken über Eigengeschwindigkeit, gerechnet auf 2000 m. Die Kurve endet beim MS des Typs.`,
+    zurueck: "← zurück zum Player",
+    pop: "<b>Das sind Populationswerte, kein Prüfstand.</b> Jede Kurve ist der Mittelwert über alle Piloten, die diesen Typ über dem Wallis geflogen sind. Alles, was sonst noch auf eine Polare wirkt — Flächenbelastung, Schirmgrösse, Gurtzeug, Gewicht des Piloten —, steckt gemittelt darin und ist nicht herausgerechnet. Ein einzelner Schirm an einem einzelnen Tag kann davon deutlich abweichen.",
+    legende: "<b>BG</b> = Beste Gleitzahl, dahinter die Eigengeschwindigkeit dazu · <b>KS</b> = Kleinstes Sinken in m/s, dahinter die Eigengeschwindigkeit dazu · <b>MS</b> = Max speed in km/h (99. Perzentil dieses Typs) · <b>n</b> = Flüge, aus denen die Polare gemessen ist",
+    sub_titel: "Was das Submarine-Gurtzeug bringt",
+    sub_text: "Zwei gemessene Polaren desselben Schirms: Enzo 3 vor 2024, und Enzo 3 ab 2024, als die Piloten auf Submarine-Gurtzeuge wechselten. Der Unterschied ist reiner Widerstand — er wächst mit der Geschwindigkeit und ist im Langsamflug fast nicht da.",
+    sub_uebertrag: "Dieser Unterschied wird im Player auf jeden anderen Schirm übertragen, wenn Du «Submarine-Style» ankreuzt.",
+    sub_ohne: "Enzo 3 (bis 2023)",
+    sub_mit: "Enzo 3 + Submarine (ab 2024)",
+    sub_tab: "Weniger Sinken",
+    gleiten: "bestes Gleiten",
+    minsink: "Minimalsinken",
+    fluege: "Flüge",
+    bei: "bei",
+    proj: "projiziert, nicht gemessen",
+    fuss: "Schirme mit wenigen Flügen (kleines n) liegen entsprechend unsicherer. MS ist das 99. Perzentil der gemessenen Eigengeschwindigkeit dieses Typs — nicht die Beschleuniger-Endgeschwindigkeit des Herstellers.",
+    achse_v: "km/h",
+    achse_s: "m/s"
+  },
+  en: {
+    titel: "Glider polars",
+    unter: n => `${n} glider types from the Valais corpus, each measured from the glides of all flights on that type. Sink over airspeed, computed at 2000 m. Each curve ends at the MS of the type.`,
+    zurueck: "← back to the player",
+    pop: "<b>These are population values, not a test bench.</b> Each curve is the average over all pilots who flew that type over the Valais. Everything else that acts on a polar — wing loading, glider size, harness, pilot weight — is averaged into it and not separated out. A single glider on a single day can differ noticeably.",
+    legende: "<b>BG</b> = best glide ratio, followed by the airspeed where it occurs · <b>KS</b> = smallest sink in m/s, followed by the airspeed where it occurs · <b>MS</b> = max speed in km/h (99th percentile of this type) · <b>n</b> = flights the polar is measured from",
+    sub_titel: "What the submarine harness gives",
+    sub_text: "Two measured polars of the same glider: Enzo 3 before 2024, and Enzo 3 from 2024, when pilots moved to submarine harnesses. The difference is pure drag — it grows with speed and is almost absent when flying slowly.",
+    sub_uebertrag: "The player applies this difference to any other glider once you tick «Submarine-style».",
+    sub_ohne: "Enzo 3 (until 2023)",
+    sub_mit: "Enzo 3 + submarine (from 2024)",
+    sub_tab: "Less sink",
+    gleiten: "best glide",
+    minsink: "min sink",
+    fluege: "flights",
+    bei: "at",
+    proj: "projected, not measured",
+    fuss: "Types with few flights (small n) are correspondingly less certain. MS is the 99th percentile of the measured airspeed on that type — not the maker's full-bar figure.",
+    achse_v: "km/h",
+    achse_s: "m/s"
+  }
+};
+let LANG = "de";
+const t = k => TXT[LANG][k];
+
+const FARBEN = ["#2a78d6", "#c8321e", "#7a3f9a", "#e09b1a", "#4a4640", "#7aa6dd", "#8a5a2b"];
+const VMIN = 25, VBIS = 63, SMIN = 0.75, SMAX = 2.7;
+let META = null;
+
+// Sinken (positiv, m/s) der Polare p bei Eigengeschwindigkeit v (km/h) — wie im Player, Koeffizienten gelten auf 2000 m
+function sinken(p, v) { const vt = Math.max(v, 18) / 3.6; return -(p[0] * vt * vt * vt + p[1] / vt); }
+function kennzahlen(p, vmax) {
+  let bg = 0, bgv = 0, ms = 99, msv = 0;
+  for (let v = VMIN; v <= vmax + 1e-9; v += 0.1) { const s = sinken(p, v), g = v / 3.6 / s;
+    if (g > bg) { bg = g; bgv = v; } if (s < ms) { ms = s; msv = v; } }
+  return {gleitzahl: bg, gleitv: bgv, minsink: ms, minsinkv: msv};
+}
+function leinwand(c) {
+  const r = window.devicePixelRatio || 1, w = c.clientWidth || 300, h = c.clientHeight || 190;
+  c.width = Math.round(w * r); c.height = Math.round(h * r);
+  const g = c.getContext("2d"); g.setTransform(r, 0, 0, r, 0, 0); g.clearRect(0, 0, w, h);
+  return [g, w, h];
+}
+// Ein Bild: Kurven = [{name, p, vmax, farbe, gestrichelt}]
+function zeichne(c, kurven) {
+  const [g, w, h] = leinwand(c);
+  const x0 = 34, x1 = w - 8, yt = 8, yb = h - 16;
+  const X = v => x0 + (x1 - x0) * (v - VMIN) / (VBIS - VMIN);
+  const Y = s => yt + (yb - yt) * (s - SMIN) / (SMAX - SMIN);
+  g.font = "10px -apple-system, Helvetica, Arial"; g.lineWidth = 1;
+  g.strokeStyle = "#ebe9e4"; g.fillStyle = "#8a867e";
+  g.textAlign = "center"; g.textBaseline = "top";
+  for (let v = 30; v <= 60; v += 10) { g.beginPath(); g.moveTo(X(v) + 0.5, yt); g.lineTo(X(v) + 0.5, yb); g.stroke();
+    g.fillText(v + (v === 60 ? " " + t("achse_v") : ""), X(v), yb + 3); }
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (let s = 1.0; s <= 2.5001; s += 0.5) { g.beginPath(); g.moveTo(x0, Y(s) + 0.5); g.lineTo(x1, Y(s) + 0.5); g.stroke();
+    g.fillText(s.toFixed(1) + (s === 1 ? " " + t("achse_s") : ""), x0 - 3, Y(s)); }
+  kurven.forEach((k, i) => {
+    g.strokeStyle = k.farbe; g.lineWidth = 1.8; g.setLineDash(k.gestrichelt ? [4, 3] : []);
+    g.beginPath(); let erst = true;
+    for (let v = VMIN; v <= Math.min(k.vmax, VBIS); v += 0.5) { const s = sinken(k.p, v); if (s > SMAX) break;
+      if (erst) g.moveTo(X(v), Y(s)); else g.lineTo(X(v), Y(s)); erst = false; }
+    g.stroke(); g.setLineDash([]);
+  });
+}
+function beschriftung(kurven) {
+  return kurven.map(k => `<span style="color:${k.farbe}">▬</span> ${k.name}${k.gestrichelt ? ` <span class="neben">(${t("proj")})</span>` : ""}`).join("<br>");
+}
+function zeile(k, allein) {
+  const z = kennzahlen(k.p, k.vmax);
+  return `<tr><td>${allein ? "" : `<span style="color:${k.farbe}">▬</span> ${k.name}`}</td>` +
+         `<td class="n">BG ${z.gleitzahl.toFixed(1)} ${t("bei")} ${z.gleitv.toFixed(0)} · KS ${z.minsink.toFixed(2)} ${t("bei")} ${z.minsinkv.toFixed(0)} · MS ${k.vmax.toFixed(0)} · n ${k.p[2]}</td></tr>`;
+}
+// Familie = erstes Wort des Namens (mentor 5 light -> mentor); daraus die Kacheln
+function familien() {
+  const P = META.polaren, V = META.vmax || {}, fam = new Map();
+  for (const name of Object.keys(P)) {
+    if (/projiz|projec/i.test(name)) continue;            // projizierte Polaren gehoeren nicht auf diese Seite (Jörg 16.9.)
+    const f = name.split(" ")[0];
+    if (!fam.has(f)) fam.set(f, []);
+    fam.get(f).push({name, p: P[name], vmax: V[name] || 55, gestrichelt: /projiz|projec/i.test(name)});
+  }
+  const liste = [...fam.entries()].sort((a, b) => a[0].localeCompare(b[0], "de"));
+  // Innerhalb einer Familie nach der Modellnummer, nicht alphabetisch (Jörg 16.9.: Sigma 6 … 11, dann die Fassungen ohne Nummer)
+  // Reihenfolge in der Familie (Jörg 16.9.): nach Modellnummer. Der blosse Familienname ist die erste Fassung (Zeolite, Mentor) und steht vorn;
+  // gibt es ihn, gehören die übrigen Fassungen ohne Nummer zu dieser ersten Generation und folgen gleich darauf (Zeolite GT vor Zeolite 2 GT).
+  // Gibt es ihn nicht (Sigma 6–11), hängen die Fassungen ohne Nummer hinten an (Sigma DLS).
+  const zahlIn = n => { const m = n.match(/(?:^|\s)(\d+)(?:\s|$)/); return m ? +m[1] : null; };
+  for (const [f, ks] of liste) {
+    const hatBasis = ks.some(k => k.name === f);
+    const nummer = n => { const z = zahlIn(n); return z !== null ? z : (hatBasis ? 1 : 1e6); };
+    ks.sort((x, y) => nummer(x.name) - nummer(y.name)
+      || ((x.name === f ? 0 : 1) - (y.name === f ? 0 : 1))
+      || x.name.localeCompare(y.name, "de"));
+    ks.forEach((k, i) => { k.farbe = FARBEN[i % FARBEN.length]; });
+  }
+  return liste;
+}
+function bauen() {
+  document.documentElement.lang = LANG;
+  document.getElementById("h_titel").textContent = t("titel");
+  document.getElementById("h_unter").textContent = t("unter")(Object.keys(META.polaren).length);
+  document.getElementById("h_pop").innerHTML = t("pop");
+  document.getElementById("h_legende").innerHTML = t("legende");
+  document.getElementById("h_zurueck").textContent = t("zurueck");
+  document.getElementById("h_fuss").textContent = t("fuss");
+  document.getElementById("sde").classList.toggle("an", LANG === "de");
+  document.getElementById("sen").classList.toggle("an", LANG === "en");
+  const gitter = document.getElementById("gitter");
+  gitter.innerHTML = "";
+
+  // 1) Submarine zuoberst: dieselbe Fläche, zwei gemessene Polaren
+  const P = META.polaren, V = META.vmax || {};
+  const ohne = P["enzo 3 (bis 2023)"], mit = P["enzo 3 + submarine (ab 2024)"];
+  if (ohne && mit) {
+    const k = document.createElement("div"); k.className = "kachel gross";
+    const kurven = [{name: t("sub_ohne"), p: ohne, vmax: V["enzo 3 (bis 2023)"] || 61, farbe: FARBEN[4]},
+                    {name: t("sub_mit"), p: mit, vmax: V["enzo 3 + submarine (ab 2024)"] || 61, farbe: FARBEN[0]}];
+    let tab = "";
+    for (const v of [30, 35, 40, 45, 50, 55, 60]) {
+      const d = sinken(mit, v) - sinken(ohne, v);
+      tab += `<tr><td>${v} km/h</td><td class="n">${d.toFixed(3)} ${t("achse_s")}</td></tr>`;
+    }
+    k.innerHTML = `<h2>${t("sub_titel")}</h2><div class="zweispalt">` +
+      `<div><canvas></canvas><div class="werte"><table>${kurven.map(x => zeile(x, false)).join("")}</table></div></div>` +
+      `<div><div class="werte" style="font-size:12px;line-height:1.5">${t("sub_text")}<br><br>` +
+      `<b>${t("sub_tab")}</b><table style="max-width:220px">${tab}</table><br>${t("sub_uebertrag")}</div></div></div>`;
+    gitter.appendChild(k);
+    zeichne(k.querySelector("canvas"), kurven);
+  }
+
+  // 2) alle Familien alphabetisch
+  for (const [f, kurven] of familien()) {
+    const k = document.createElement("div"); k.className = "kachel";
+    const eins = kurven.length === 1;
+    k.innerHTML = `<h2>${eins ? kurven[0].name : f}</h2><canvas></canvas><div class="werte"><table>${kurven.map(x => zeile(x, eins)).join("")}</table></div>`;
+    gitter.appendChild(k);
+    zeichne(k.querySelector("canvas"), kurven);
+  }
+}
+document.getElementById("sde").addEventListener("click", () => { LANG = "de"; bauen(); });
+document.getElementById("sen").addEventListener("click", () => { LANG = "en"; bauen(); });
+window.addEventListener("resize", () => { if (META) bauen(); });
+fetch("daten/meta.json").then(r => r.json()).then(m => { META = m; bauen(); })
+  .catch(e => { document.getElementById("h_unter").textContent = "Daten nicht ladbar: " + e.message; });
+</script>
+</body>
+</html>
