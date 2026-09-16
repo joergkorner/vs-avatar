@@ -2480,7 +2480,7 @@ function zustandPilot(tj) {
   // Fahrt und Steigen über ein Fenster von ~30 s (±15 s) statt zwischen zwei Punkten — sonst flimmern km/h und Bar bei 30×
   let i0 = lo_, i1 = hi_; while (i0 > 0 && P[lo_][0] - P[i0][0] < 15) i0--; while (i1 < P.length - 1 && P[i1][0] - P[hi_][0] < 15) i1++;
   const A = P[i0], B = P[i1], dts = Math.max(B[0] - A[0], 1), ve = (B[2] - A[2]) * KX / dts * 3.6, vn = (B[1] - A[1]) * KY / dts * 3.6, v = Math.hypot(ve, vn);
-  return {la: a[1] + (b[1] - a[1]) * f, lo: a[2] + (b[2] - a[2]) * f, h: a[3] + (b[3] - a[3]) * f, v, ve, vn, vz: (B[3] - A[3]) / dts};
+  return {la: a[1] + (b[1] - a[1]) * f, lo: a[2] + (b[2] - a[2]) * f, h: a[3] + (b[3] - a[3]) * f, v, ve, vn, vz: (B[3] - A[3]) / dts, i: lo_};
 }
 // ------------------------------------------------------------ Vergleich im Kopf (Jörg 15.9.2026): läuft mit der Uhr mit, auch bei eingeklappten Einstellungen.
 // Oben: Anteil der Gleitzeit mit Steigen — der Schirm gewinnt Höhe, ohne zu kreisen (Vario > 0 über ±14 s; beim Avatar ein Gleitzug,
@@ -2680,7 +2680,9 @@ function zeichneMarker(g) {
     if (z) { const q = marker(z.la, z.lo, "#c8321e"); const ug = z.h - demBei(z.la, z.lo);
       // Eigengeschwindigkeit = Fahrt über Grund minus Wind aus der Bart-Drift (ohne Windwert: Fahrt über Grund); Bar daraus wie beim Avatar
       const wd = windBei(z.la, z.lo, z.h, PILOT.t0h + tj / 3600), ve = wd ? Math.hypot(z.ve - wd[0], z.vn - wd[1]) : z.v;
-      const fahrt = z.ende ? t("gelandet") : !(z.v > 5) || !isFinite(ve) ? "" : z.vz > 0.3 ? `${z.v.toFixed(0)} km/h ↑${z.vz.toFixed(1)}` : `${ve.toFixed(0)} km/h · ${barText(ve)}`;
+      const kurbelt = PILOT.kreis && z.i != null && PILOT.kreis[z.i];       // dieselbe Erkennung wie in den Bildern
+      const fahrt = z.ende ? t("gelandet") : kurbelt ? `${t("kurbelt")} ${z.vz >= 0 ? "+" : ""}${z.vz.toFixed(1)} m/s`
+        : !(z.v > 5) || !isFinite(ve) ? "" : z.vz > 0.3 ? `${z.v.toFixed(0)} km/h ↑${z.vz.toFixed(1)}` : `${ve.toFixed(0)} km/h · ${barText(ve)}`;
       label(lP, q, [`${PILOT.name || t("pilot")} ${z.h.toFixed(0)} m`, isFinite(ug) ? ug.toFixed(0) + " m " + t("ug") : "", fahrt].filter(Boolean).join(" · "), z.h); }
   }
   labelsSetzen();
@@ -3166,9 +3168,10 @@ async function igcLaden(file) {
   const text = await file.text(); const I = igcLesen(text, file.name.replace(/\.igc$/i, ""));
   if (!I) { document.getElementById("rechne").textContent = t("igc_kein"); return; }
   const A = igcAufgabe(I); if (!A) { document.getElementById("rechne").textContent = `${I.name}: ` + t("igc_kein"); return; }
+  I.kreis = kreisMaske(I.pts, 0, I.pts.length - 1);      // einmal je Flug: wo kurbelt der Pilot (Jörg 16.9.)
   // eine neue IGC ersetzt alles Alte: Lauf, Korridor, Abspielen — bis das neue Ergebnis da ist, steht nur der Pilot auf der Karte
   anhalten(); LAUF = null; KORR = null; ABHIER = null; uhr = 0; document.getElementById("status").textContent = ""; autoStart = true;
-  PILOT = {p: I.pts.map(p => [p[0] - I.pts[A.i0][0], p[1], p[2], p[3]]), t0h: A.start.zeit, name: t("pilot"), datum: I.datum, datei: I.name, i1: A.i1};
+  PILOT = {p: I.pts.map(p => [p[0] - I.pts[A.i0][0], p[1], p[2], p[3]]), t0h: A.start.zeit, name: t("pilot"), datum: I.datum, datei: I.name, i1: A.i1, kreis: I.kreis};
   // W des Flugs, auf den Tagesgang normiert (Gang des Korpus-Tages, sonst der Korpus-Gang)
   const tgTag = tagesDecke(I.datum), gangW = TAGE ? gangVoll(null) : null;      // Korpus-Gang (der Tag selbst ist an den Rändern zu unsicher)
   const Wp = igcW(I, A.i0, A.i1, gangW, A.start.zeit), Wf = Wp ? Wp[0] : null;
