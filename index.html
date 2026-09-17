@@ -745,9 +745,14 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
 #leiste .wert { min-width: 60px; font-variant-numeric: tabular-nums; font-weight: 600; }
 #info { font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 2; }
 #fenster { position: absolute; z-index: 950; pointer-events: none; background: rgba(252,252,251,.95); border: 1px solid #d7d5d0; border-radius: 6px; padding: 3px 7px; font-size: 12px; display: none; white-space: nowrap; }
-.lbl { position: absolute; z-index: 940; pointer-events: none; font-size: 12px; padding: 2px 6px; border-radius: 5px; background: rgba(252,252,251,.94); border: 1px solid; white-space: nowrap; display: none; font-variant-numeric: tabular-nums; }
+.lbl { position: absolute; z-index: 940; pointer-events: auto; cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 5px; background: rgba(252,252,251,.94); border: 1px solid; white-space: nowrap; display: none; font-variant-numeric: tabular-nums; }
 #lblA { border-color: #2a78d6; color: #1d4f8f; }
 #lblP { border-color: #c8321e; color: #8f2314; }
+.lbl.fuehrt { border-width: 2px; padding: 1px 5px; box-shadow: 0 0 0 2px rgba(252,252,251,.95), 0 0 0 3px currentColor; }
+.lbl.wechsel { animation: lblblink .45s 3; }
+@keyframes lblblink { 50% { box-shadow: 0 0 0 2px rgba(252,252,251,.95), 0 0 0 6px currentColor; } }
+.fuehrtwahl { display: inline-flex; gap: 4px; margin-left: 10px; vertical-align: middle; }
+.fuehrtwahl .knopf { padding: 1px 8px; font-size: 12px; }
 #bartinfo { position: absolute; right: 10px; top: 10px; z-index: 900; width: 250px; padding: 10px 12px; display: none; }
 #bartinfo .zu { position: absolute; right: 8px; top: 6px; border: none; background: none; cursor: pointer; color: #6e6a61; font-size: 14px; }
 #bartinfo table { border-collapse: collapse; font-size: 12px; margin-top: 4px; }
@@ -827,7 +832,7 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
         <button class="knopf an" id="ksinken" data-t="sinken" data-tt="tt_sink" title="sinkende Luft (unter 0 m/s) flächig rötlich">Sinkzone</button>
         <button class="knopf an" id="kfolgen" data-t="folgen" data-tt="tt_folgen" title="Die Karte folgt beim Abspielen: Avatar und Pilot bleiben beide im Bild (aus: Karte bleibt stehen)">Folgen</button>
       </div>
-      <div class="reihe"><label><input type="checkbox" id="kkoppel" checked> <span data-t="koppel">Feld und Bärte folgen dem Avatar</span></label></div>
+      <div class="reihe"><label><input type="checkbox" id="kkoppel" checked> <span data-t="koppel">Feld und Bärte folgen dem Fliegenden</span></label><span class="fuehrtwahl"><button class="knopf" id="kfA" data-t="st_avatar">Avatar</button><button class="knopf" id="kfP" data-t="pilot">Pilot</button><button class="knopf an" id="kfAuto" data-t="f_auto">auto</button></span></div>
     </div>
     <div id="eigene">
       <div class="neben" data-t="e_hilf">Punkte per Klick auf die Karte setzen — der Reihe nach.</div>
@@ -1923,7 +1928,7 @@ const META = {"stand": "2026-09-15", "nx": 371, "ny": 259, "x0": -85, "y0": -62,
 const BAU = "17.9.2026";                    // Datum, an dem diese Seite gebaut wurde (setzt der Bau ein)
 const TXT = {
   de: {titel: "Wallis — Avatar", aufgabe: "Aufgabe", tag: "Tag", we: "Wochenende",
-       feld: "Feld", baerte: "Bärte", luft: "Lufträume", relief: "Relief", wolke: "Wolke", folgen: "Folgen", fuell: "Auffüllung", sinken: "Sinkzone", l_sinkflaeche: "Sinkzone", koppel: "Feld und Bärte folgen dem Avatar", sub: "Submarine-Style", schirm: "Schirm", tag: "Tag", gurt: "Gurtzeug", w_lab: "Thermik W", w_erkl: "W = Tagesstärke der Thermik (Median des Steigens im Kreisen, m/s)", gurt_titel: "Gurtzeug", gurt_frage: "Fliegt dieser Pilot ein Submarine-Style-Gurtzeug (Submarine, Sublite …)?", ja: "ja", nein: "nein", gurt_hilf: "Steht in keiner IGC. Ändert die Polare mit der Geschwindigkeit (bei 45 km/h rund 0,07 m/s weniger Sinken, wie am Enzo 3 gemessen). Danach startet der Avatar.",
+       feld: "Feld", baerte: "Bärte", luft: "Lufträume", relief: "Relief", wolke: "Wolke", folgen: "Folgen", fuell: "Auffüllung", sinken: "Sinkzone", l_sinkflaeche: "Sinkzone", koppel: "Feld und Bärte folgen dem Fliegenden", f_folgt: "Feld folgt", f_fest: "fest", f_auto: "auto", sub: "Submarine-Style", schirm: "Schirm", tag: "Tag", gurt: "Gurtzeug", w_lab: "Thermik W", w_erkl: "W = Tagesstärke der Thermik (Median des Steigens im Kreisen, m/s)", gurt_titel: "Gurtzeug", gurt_frage: "Fliegt dieser Pilot ein Submarine-Style-Gurtzeug (Submarine, Sublite …)?", ja: "ja", nein: "nein", gurt_hilf: "Steht in keiner IGC. Ändert die Polare mit der Geschwindigkeit (bei 45 km/h rund 0,07 m/s weniger Sinken, wie am Enzo 3 gemessen). Danach startet der Avatar.",
        l_avatar: "Avatar", l_pilot: "Pilot", l_bart: "Bart-Zelle", l_zu: "gesperrt",
        info: "Erklärung", stand: "Stand", lade: "lade …", los: "Demo-Route ansehen", ohne: "Keine IGC?", ohne_hilf: "— Start, drei Wendepunkte und Landung stehen schon auf der Karte; zieh sie mit der Maus dorthin, wo Du fliegen willst.", einst: "Einstellungen", neu: "Neustart", prot: "Protokoll", rechnet_kurz: "Rechnung läuft …",
        e_hilf: "Punkte per Klick auf die Karte setzen — der Reihe nach. Der Avatar startet am Boden.", e_start: "Start", e_wp: "Wendepunkt", e_leit: "Leitpunkt", e_ziel: "Ziel", e_zeit: "Start", e_rund: "Ziel = Start", e_zurueck: "Zurück", e_leer: "Löschen", e_rechnen: "Rechnen",
@@ -1934,7 +1939,7 @@ const TXT = {
        abhier_erg: "ab hier", abhier_kein: "ab hier kommt kein Lauf an", igc_start: "Avatar fliegt mit — zur typischen Startzeit für dieses W", igc_kein: "Die Spur liegt nicht im Wallis-Feld oder ist zu kurz.", pilot: "Pilot",
        k1: "gemessen", k2: "geweitet (Klasse 2)", k3: "Gelände-Schätzung (Klasse 3)", k4: "dünn belegt (Klasse 4: nur wenige Flüge)"},
   en: {titel: "Valais — avatar", aufgabe: "Task", tag: "Day", we: "Weekend",
-       feld: "Field", baerte: "Thermals", luft: "Airspace", relief: "Relief", wolke: "Cloud", folgen: "Follow", fuell: "Fill-in", sinken: "Sink zone", l_sinkflaeche: "sink zone", koppel: "Field and thermals follow the avatar", sub: "Submarine-style", schirm: "Glider", tag: "Day", gurt: "Harness", w_lab: "Thermals W", w_erkl: "W = the day's thermal strength (median climb rate while circling, m/s)", gurt_titel: "Harness", gurt_frage: "Does this pilot fly a submarine-style harness (Submarine, Sublite …)?", ja: "yes", nein: "no", gurt_hilf: "No IGC records it. It changes the polar with speed (about 0.07 m/s less sink at 45 km/h, as measured on the Enzo 3). The avatar starts afterwards.",
+       feld: "Field", baerte: "Thermals", luft: "Airspace", relief: "Relief", wolke: "Cloud", folgen: "Follow", fuell: "Fill-in", sinken: "Sink zone", l_sinkflaeche: "sink zone", koppel: "Field and thermals follow whoever is flying", f_folgt: "field follows", f_fest: "held", f_auto: "auto", sub: "Submarine-style", schirm: "Glider", tag: "Day", gurt: "Harness", w_lab: "Thermals W", w_erkl: "W = the day's thermal strength (median climb rate while circling, m/s)", gurt_titel: "Harness", gurt_frage: "Does this pilot fly a submarine-style harness (Submarine, Sublite …)?", ja: "yes", nein: "no", gurt_hilf: "No IGC records it. It changes the polar with speed (about 0.07 m/s less sink at 45 km/h, as measured on the Enzo 3). The avatar starts afterwards.",
        l_avatar: "Avatar", l_pilot: "Pilot", l_bart: "thermal cell", l_zu: "closed",
        info: "About", stand: "Data as of", lade: "loading …", los: "See the demo route", ohne: "No IGC?", ohne_hilf: "— launch, three turnpoints and landing are already on the map; drag them where you want to fly.", einst: "Settings", neu: "Restart", prot: "Log", rechnet_kurz: "computing …",
        e_hilf: "Set points by clicking on the map — in order. The avatar starts on the ground.", e_start: "Start", e_wp: "Turnpoint", e_leit: "Guide point", e_ziel: "Goal", e_zeit: "Start", e_rund: "Goal = start", e_zurueck: "Undo", e_leer: "Clear", e_rechnen: "Compute",
@@ -2855,7 +2860,7 @@ function zeichneMarker(g) {
     const z = zustandAvatar(LAUF.glatt || LAUF.lauf.pfad, uhr);
     if (z) { const q = marker(z.la, z.lo, "#2a78d6"); const ug = z.h - demBei(z.la, z.lo);
       const tun = z.art === "G" && z.soart ? t("soart") : z.art === "G" ? `${t("gleitet")} ${z.v.toFixed(0)} km/h · ${barText(z.v)}` : z.art === "K" ? `${t("kurbelt")} ${z.steig >= 0 ? "+" : ""}${z.steig.toFixed(1)} m/s` : z.art === "W" ? t("wartet") + (spult ? " · " + t("spult") : "") : z.art === "H" ? t("haelt") + (z.steig < -0.05 ? ` ${z.steig.toFixed(1)} m/s` : "") : z.art === "F" ? t("prueft") : z.art === "L" ? (z.stufe === 1 ? t("spirale") : t("volte")) : z.art === "E" ? (LAUF.ok && LAUF.lauf.pfad[LAUF.lauf.pfad.length - 1][4] !== "L" ? t("angekommen") : t("gelandet")) : t("start");
-      label(lA, q, [`${t("st_avatar")} ${z.h.toFixed(0)} m`, isFinite(ug) ? ug.toFixed(0) + " m " + t("ug") : "", tun].filter(Boolean).join(" · "), z.h); }
+      label(lA, q, [`${t("st_avatar")} ${z.h.toFixed(0)} m`, isFinite(ug) ? ug.toFixed(0) + " m " + t("ug") : "", tun, FUEHRT.fest === "avatar" ? t("f_fest") : ""].filter(Boolean).join(" · "), z.h); }
   }
   if (PILOT) {
     const tj = uhr + ((LAUF ? LAUF.t0h : PILOT.t0h) - PILOT.t0h) * 3600; const z = zustandPilot(tj);
@@ -2865,7 +2870,7 @@ function zeichneMarker(g) {
       const kurbelt = PILOT.kreis && z.i != null && PILOT.kreis[z.i];       // dieselbe Erkennung wie in den Bildern
       const fahrt = z.ende ? t("gelandet") : kurbelt ? `${t("kurbelt")} ${z.vz >= 0 ? "+" : ""}${z.vz.toFixed(1)} m/s`
         : !(z.v > 5) || !isFinite(ve) ? "" : z.vz > 0.3 ? `${z.v.toFixed(0)} km/h ↑${z.vz.toFixed(1)}` : `${ve.toFixed(0)} km/h · ${barText(ve)}`;
-      label(lP, q, [`${PILOT.name || t("pilot")} ${z.h.toFixed(0)} m`, isFinite(ug) ? ug.toFixed(0) + " m " + t("ug") : "", fahrt].filter(Boolean).join(" · "), z.h); }
+      label(lP, q, [`${PILOT.name || t("pilot")} ${z.h.toFixed(0)} m`, isFinite(ug) ? ug.toFixed(0) + " m " + t("ug") : "", fahrt, FUEHRT.fest === "pilot" ? t("f_fest") : ""].filter(Boolean).join(" · "), z.h); }
   }
   labelsSetzen();
 }
@@ -3520,18 +3525,57 @@ document.body.addEventListener("dragleave", e => { if (e.relatedTarget === null)
 document.body.addEventListener("drop", e => { e.preventDefault(); dropEl.style.display = "none"; dropFelder().forEach(d => d.classList.remove("aktiv")); const f = e.dataTransfer.files[0]; if (f) igcLaden(f); });
 
 // ------------------------------------------------------------ Uhr und Bedienung
+// Wer führt das Feld (Jörg 17.9.): Höhe und Bärte folgen dem, der gerade fliegt — vor dem Start des Avatars und nach seiner Landung dem
+// Piloten, nach der Landung des Piloten dem Avatar. Fliegen beide, wechselt es alle FUEHRT_WECHSEL_S Sekunden (echte Zeit, beim Abspielen).
+// Ein Klick auf eines der beiden Fenster (oder die Knöpfe Avatar | Pilot | auto) hält das Feld FUEHRT_FEST_S Sekunden auf einem fest.
+// Das Fenster des Führenden hat einen dicken Rand, beim Wechsel blinkt er dreimal; die Zeile unten sagt «Feld folgt Pilot».
+const FUEHRT_WECHSEL_S = 20, FUEHRT_FEST_S = 120;
+const FUEHRT = {wer: null, seit: 0, fest: null, festBis: 0};
+function pilotZeit(tt) { return tt + ((LAUF ? LAUF.t0h : PILOT.t0h) - PILOT.t0h) * 3600; }
+function fliegtAvatar(tt) { if (!LAUF || !LAUF.lauf) return false; const z = zustandAvatar(LAUF.lauf.pfad, tt); return !!z && z.art !== "S" && z.art !== "E"; }
+function fliegtPilot(tt) { if (!PILOT) return false; const tj = pilotZeit(tt), P = PILOT.p; return tj > P[0][0] && tj < P[P.length - 1][0]; }
+function fuehrtBestimmen(tt) {
+  const jetzt = performance.now(), hatA = !!(LAUF && LAUF.lauf), hatP = !!PILOT;
+  if (!hatA && !hatP) { FUEHRT.wer = null; return null; }
+  if (FUEHRT.fest && jetzt > FUEHRT.festBis) FUEHRT.fest = null;
+  let wer;
+  if (FUEHRT.fest && (FUEHRT.fest === "avatar" ? hatA : hatP)) wer = FUEHRT.fest;
+  else if (!hatP) wer = "avatar";
+  else if (!hatA) wer = "pilot";
+  else { const fa = fliegtAvatar(tt), fp = fliegtPilot(tt);
+    if (fa && !fp) wer = "avatar"; else if (fp && !fa) wer = "pilot";
+    else if (!FUEHRT.wer) wer = fa ? "avatar" : "pilot";
+    else wer = (spiel && jetzt - FUEHRT.seit > FUEHRT_WECHSEL_S * 1000) ? (FUEHRT.wer === "avatar" ? "pilot" : "avatar") : FUEHRT.wer; }
+  if (wer !== FUEHRT.wer) { const alt = FUEHRT.wer; FUEHRT.wer = wer; FUEHRT.seit = jetzt;
+    const el = document.getElementById(wer === "avatar" ? "lblA" : "lblP"); el.classList.remove("wechsel"); if (alt) { void el.offsetWidth; el.classList.add("wechsel"); setTimeout(() => el.classList.remove("wechsel"), 1500); } }
+  document.getElementById("lblA").classList.toggle("fuehrt", wer === "avatar"); document.getElementById("lblP").classList.toggle("fuehrt", wer === "pilot");
+  return wer;
+}
+function fuehrtFest(wer) {                   // Klick auf ein Fenster oder einen Knopf: festhalten, nochmals: freigeben; null = auto
+  FUEHRT.fest = (wer && FUEHRT.fest !== wer) ? wer : null; FUEHRT.festBis = performance.now() + FUEHRT_FEST_S * 1000;
+  for (const [id, w] of [["kfA", "avatar"], ["kfP", "pilot"], ["kfAuto", null]]) document.getElementById(id).classList.toggle("an", FUEHRT.fest === w);
+  uhrSetzen(uhr);
+}
 function uhrSetzen(tt) {
   uhr = tt; document.getElementById("szeit").value = tt;
   const t0h = LAUF ? LAUF.t0h : PILOT ? PILOT.t0h : (AUFG ? AUFG.start.zeit : 12);
   document.getElementById("wzeit").textContent = zeitText(t0h + tt / 3600);
-  if (an.koppel) { anzeige.t = Math.min(Math.max(t0h + tt / 3600, ST0), TAG_ENDE);
-    const z = LAUF && LAUF.lauf ? zustandAvatar(LAUF.lauf.pfad, tt) : (PILOT ? zustandPilot(tt) : null); if (z) anzeige.h = Math.min(Math.max(z.h, H0), META.hoehen[NL - 1]); }
+  let wer = null;
+  if (an.koppel) { anzeige.t = Math.min(Math.max(t0h + tt / 3600, ST0), TAG_ENDE); wer = fuehrtBestimmen(tt);
+    const z = wer === "pilot" ? zustandPilot(pilotZeit(tt)) : wer === "avatar" ? zustandAvatar(LAUF.lauf.pfad, tt) : null; if (z) anzeige.h = Math.min(Math.max(z.h, H0), META.hoehen[NL - 1]); }
+  else { for (const id of ["lblA", "lblP"]) document.getElementById(id).classList.remove("fuehrt", "wechsel"); FUEHRT.wer = null; }
   let info = "";
   if (LAUF && LAUF.lauf) { const z = zustandAvatar(LAUF.glatt || LAUF.lauf.pfad, tt); if (z) info += `${t("st_avatar")} ${z.h.toFixed(0)} m`; }
-  if (PILOT) { const z = zustandPilot(tt + ((LAUF ? LAUF.t0h : PILOT.t0h) - PILOT.t0h) * 3600); if (z) info += (info ? " · " : "") + `${PILOT.name || t("pilot")} ${z.h.toFixed(0)} m`; }
-  document.getElementById("info").textContent = info + (an.koppel ? ` · ${t("feld")} ${anzeige.h.toFixed(0)} m` : "");
+  if (PILOT) { const z = zustandPilot(pilotZeit(tt)); if (z) info += (info ? " · " : "") + `${PILOT.name || t("pilot")} ${z.h.toFixed(0)} m`; }
+  const werText = wer === "pilot" ? (PILOT.name || t("pilot")) : wer === "avatar" ? t("st_avatar") : null;
+  document.getElementById("info").textContent = info + (an.koppel ? ` · ${werText ? `${t("f_folgt")} ${werText}${FUEHRT.fest ? " (" + t("f_fest") + ")" : ""} · ` : t("feld") + " "}${anzeige.h.toFixed(0)} m` : "");
   vgZeichnen(tt); folgen(); nachladen(); zeichneAlles(); zeichneProfil();
 }
+document.getElementById("lblA").addEventListener("click", e => { e.stopPropagation(); fuehrtFest("avatar"); });
+document.getElementById("lblP").addEventListener("click", e => { e.stopPropagation(); fuehrtFest("pilot"); });
+document.getElementById("kfA").addEventListener("click", () => fuehrtFest("avatar"));
+document.getElementById("kfP").addEventListener("click", () => fuehrtFest("pilot"));
+document.getElementById("kfAuto").addEventListener("click", () => fuehrtFest(null));
 async function nachladen() {
   const st = anzeige.t, Hi = Math.min(Math.max(Math.floor(st), ST0), ST1 - 1), wk = wkVon(W_SEL);
   const p = [lade(Hi, wk)]; if (st > Hi) p.push(lade(Hi + 1, wk));
@@ -3551,7 +3595,7 @@ function beideWarten(tt) {
 function abspielen() {
   if (spiel) return;
   if (uhr >= zeitEnde() - 30) uhr = zeitAnfang();
-  document.getElementById("kplay").textContent = "❚❚"; letzterTick = performance.now();
+  document.getElementById("kplay").textContent = "❚❚"; letzterTick = performance.now(); FUEHRT.seit = letzterTick;
   const schritt = now => { const dt = Math.min((now - letzterTick) / 1000, 0.5); letzterTick = now; spult = beideWarten(uhr); let tt = uhr + dt * (spult ? Math.max(tempo, SPUL_TEMPO) : tempo); if (tt >= zeitEnde()) { uhrSetzen(zeitEnde()); anhalten(); return; } uhrSetzen(tt); spiel = requestAnimationFrame(schritt); };
   spiel = requestAnimationFrame(schritt);
 }
@@ -3620,7 +3664,8 @@ document.getElementById("neustart").addEventListener("click", () => {
   uhr = 0; START_MANUELL = false; STARTZEIT = startTypisch(WAN ? W_WERT : null);
   document.getElementById("szeit").value = 0; document.getElementById("wzeit").textContent = "\u2013:\u2013";
   document.getElementById("info").textContent = ""; document.getElementById("vergleich").style.display = "none";
-  for (const id of ["lblA", "lblP"]) { const e = document.getElementById(id); if (e) e.style.display = "none"; }
+  for (const id of ["lblA", "lblP"]) { const e = document.getElementById(id); if (e) { e.style.display = "none"; e.classList.remove("fuehrt", "wechsel"); } }
+  FUEHRT.wer = null; FUEHRT.fest = null; for (const [id, w] of [["kfA", "avatar"], ["kfP", "pilot"], ["kfAuto", null]]) document.getElementById(id).classList.toggle("an", w === null);
   zeichneProfil(); steuerHoehe();
   document.getElementById("bquelle").textContent = ""; document.getElementById("status").textContent = "";
   document.getElementById("rechne").textContent = ""; protokollLeeren(); deckelWarnung(null);
