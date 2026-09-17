@@ -940,7 +940,7 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
           <li>Bärte bis 21:30, gegleitet wird bis 22:00.</li>
           <li>Am Hang soart er dort, wo das Feld unter 300 m über Grund trägt.</li>
           <li>Unter 600 m über Grund gilt Luftraum G: die CTA sperren dort nicht, CTR sowie R-, P- und Q-Gebiete schon.</li>
-          <li>Das Feld ist das Wallis. Eine Spur ausserhalb wird nicht angenommen.</li>
+          <li>Das Feld ist das Wallis, so weit der Korpus reicht. Liegt weniger als die Hälfte der Spur darin, wird sie nicht angenommen; liegen Teile ausserhalb, steht es im Protokoll.</li>
         </ul>
       </details>
 
@@ -986,7 +986,7 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
           <li>Thermals until 21:30, gliding until 22:00.</li>
           <li>It ridge-soars where the field carries below 300 m above ground.</li>
           <li>Below 600 m above ground airspace G applies: the CTA do not close it there, CTR and R, P and Q areas do.</li>
-          <li>The field is the Valais. A track outside it is not accepted.</li>
+          <li>The field is the Valais, as far as the corpus reaches. If less than half of the track lies inside, it is not accepted; parts outside are noted in the protocol.</li>
         </ul>
       </details>
 
@@ -3047,12 +3047,36 @@ function protokollKopf(I) {                  // die ersten Zeilen jedes Protokol
     protokollZeile(teile.join(" · "));
   }
 }
-function protokollAusserhalb(I, name) {      // die Spur liegt nicht im Feld (oder ist zu kurz): sagen, wo das Feld ist
+function protokollAusserhalb(I, name, anteil) {      // die Spur liegt nicht im Feld (oder ist zu kurz): sagen, wo das Feld ist
   const de = LANG === "de", r = feldRand(), gebiet = t("titel").split(" — ")[0];
   protokollLeeren(); protokollKopf(Object.assign({datei: name}, I || {}));
-  protokollZeile(de ? `Gebiet ${gebiet}: ${r.lo0.toFixed(1)}–${r.lo1.toFixed(1)}° O, ${r.la0.toFixed(2)}–${r.la1.toFixed(2)}° N — die Spur liegt ausserhalb oder ist zu kurz, nichts gerechnet`
-                    : `Area ${gebiet}: ${r.lo0.toFixed(1)}–${r.lo1.toFixed(1)}° E, ${r.la0.toFixed(2)}–${r.la1.toFixed(2)}° N — the track lies outside or is too short, nothing computed`, true);
+  if (anteil != null) { const p = Math.round((1 - anteil) * 100);
+    protokollZeile(de ? `Die Spur liegt zu ${p} % ausserhalb des gemessenen Feldes (${gebiet}) — nichts gerechnet`
+                      : `${p} % of the track lies outside the measured field (${gebiet}) — nothing computed`, true); }
+  else protokollZeile(de ? `Gebiet ${gebiet}: ${r.lo0.toFixed(1)}–${r.lo1.toFixed(1)}° O, ${r.la0.toFixed(2)}–${r.la1.toFixed(2)}° N — die Spur liegt ausserhalb oder ist zu kurz, nichts gerechnet`
+                         : `Area ${gebiet}: ${r.lo0.toFixed(1)}–${r.lo1.toFixed(1)}° E, ${r.la0.toFixed(2)}–${r.la1.toFixed(2)}° N — the track lies outside or is too short, nothing computed`, true);
   document.getElementById("protzeig").classList.add("auf"); document.getElementById("protokoll").style.display = "";
+}
+// Gemessenes Feld (Jörg 17.9., Marbachegg-Flug lag im Rechteck des Rasters, aber nicht im Feld): «im Feld» heisst höchstens FELD_NAH_KM von einer
+// Bart-Zelle des Korpus entfernt. Wallis-Flüge liegen so zu 97–100 % im Feld, ein Flug im Entlebuch zu 22 %.
+const FELD_NAH_KM = 3, SPUR_IM_FELD_MIN = 0.5, SPUR_IM_FELD_VERMERK = 0.9;
+let FELD_NAH = null;
+function feldNah() {
+  if (FELD_NAH || !BAERTE) return FELD_NAH;
+  const n = NX * NY, m = new Uint8Array(n), R = Math.round(FELD_NAH_KM / META.zelle_km);
+  for (const k of zellIndex.keys()) { const ix = k % NX, iy = Math.floor(k / NX);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) { if (dx * dx + dy * dy > R * R) continue; const x = ix + dx, y = iy + dy; if (x >= 0 && x < NX && y >= 0 && y < NY) m[y * NX + x] = 1; } }
+  return FELD_NAH = m;
+}
+function spurImFeld(P, i0, i1) {             // Anteil der Spurpunkte (Start bis Landung) im gemessenen Feld, 0…1
+  const m = feldNah(); if (!m) return 1; let n = 0, k = 0;
+  for (let i = i0; i <= i1; i++) { n++; const [ix, iy] = zelleVon(P[i][1], P[i][2]); if (ix >= 0 && ix < NX && iy >= 0 && iy < NY && m[iy * NX + ix]) k++; }
+  return n ? k / n : 0;
+}
+function spurVermerk() {                     // Teile der Spur ausserhalb des gemessenen Feldes: dort kann der Avatar nicht rechnen
+  if (!PILOT || PILOT.imFeld == null || PILOT.imFeld >= SPUR_IM_FELD_VERMERK) return "";
+  const p = Math.round((1 - PILOT.imFeld) * 100);
+  return LANG === "de" ? `Spur zu ${p} % ausserhalb des gemessenen Feldes — dort kann der Avatar nicht rechnen` : `${p} % of the track outside the measured field — the avatar cannot compute there`;
 }
 function ergebnisZeilen() {                  // die lange Ergebniszeile in kurze Stücke: an « · », Satzenden und «; »
   const kopf = document.getElementById("status").textContent; if (!kopf) return [];
@@ -3091,6 +3115,7 @@ async function avatarRechnen() {
   if (PILOT) { const q = document.getElementById("schirmquelle").textContent.replace(/^IGC:\s*/, ""); if (q) protokollZeile((LANG === "de" ? "Schirm: " : "Glider: ") + q); }
   { const z = tagVermerk(); if (z) protokollZeile(z); }
   protokollZeile(wVermerk()); protokollZeile(feldVermerk());
+  { const z = spurVermerk(); if (z) protokollZeile(z); }
   const bufs = await Promise.all(META.stunden.map(H => lade(H, wk)));
   const key = W_SEL === "alle" ? "alle" : (+W_SEL).toFixed(1);
   if (!START_MANUELL) STARTZEIT = startVorgabe();                    // Basis der Startwahl ist immer die Vorgabe (typisch für W, früh wenn lang) — nicht die letzte Wahl
@@ -3438,10 +3463,14 @@ async function igcLaden(file) {
   const text = await file.text(); const I = igcLesen(text, file.name.replace(/\.igc$/i, ""));
   if (!I) { document.getElementById("rechne").textContent = t("igc_kein"); protokollAusserhalb(null, file.name); return; }
   const A = igcAufgabe(I); if (!A) { document.getElementById("rechne").textContent = `${I.name}: ` + t("igc_kein"); protokollAusserhalb(I, I.name); return; }
+  // liegt die Spur im gemessenen Feld? — vor allem anderen, auch vor der Gurtzeug-Frage (Jörg 17.9.: «wieso checkt er das nicht zuerst?»)
+  const imFeld = spurImFeld(I.pts, A.i0, A.i1);
+  if (imFeld < SPUR_IM_FELD_MIN) { document.getElementById("rechne").textContent = `${I.name}: ` + t("igc_kein"); protokollAusserhalb(I, I.name, imFeld); return; }
+  I.imFeld = imFeld;
   I.kreis = kreisMaske(I.pts, 0, I.pts.length - 1);      // einmal je Flug: wo kurbelt der Pilot (Jörg 16.9.)
   // eine neue IGC ersetzt alles Alte: Lauf, Korridor, Abspielen — bis das neue Ergebnis da ist, steht nur der Pilot auf der Karte
   anhalten(); LAUF = null; KORR = null; ABHIER = null; uhr = 0; document.getElementById("status").textContent = ""; autoStart = true;
-  PILOT = {p: I.pts.map(p => [p[0] - I.pts[A.i0][0], p[1], p[2], p[3]]), t0h: A.start.zeit, name: t("pilot"), datum: I.datum, datei: I.name, i1: A.i1, kreis: I.kreis, pilot: I.pilot, ort: I.ort, schirmName: I.schirm};
+  PILOT = {p: I.pts.map(p => [p[0] - I.pts[A.i0][0], p[1], p[2], p[3]]), t0h: A.start.zeit, name: t("pilot"), datum: I.datum, datei: I.name, i1: A.i1, kreis: I.kreis, pilot: I.pilot, ort: I.ort, schirmName: I.schirm, imFeld: I.imFeld};
   // W des Flugs, auf den Tagesgang normiert (Gang des Korpus-Tages, sonst der Korpus-Gang)
   const tgTag = tagesDecke(I.datum), gangW = TAGE ? gangVoll(null) : null;      // Korpus-Gang (der Tag selbst ist an den Rändern zu unsicher)
   const Wp = igcW(I, A.i0, A.i1, gangW, A.start.zeit), Wflug = Wp ? Wp[0] : null;
