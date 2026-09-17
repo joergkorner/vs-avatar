@@ -916,10 +916,10 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
       <details><summary>Was lesen wir aus Deiner IGC?</summary>
         <ul class="neben">
           <li><b>Die Aufgabe</b> — Abflug, drei Wendepunkte, Landung: die Punkte, die den Flug am längsten machen.</li>
-          <li><b>Die Thermikstärke</b> — der Median Deines Steigens im Kreisen, auf die Tageszeit umgerechnet.</li>
+          <li><b>Die Thermikstärke</b> — für Tage im Korpus aus allen Flügen dieses Tages; sonst aus Deinem Flug, der Median Deines Steigens im Kreisen, auf die Tageszeit umgerechnet.</li>
           <li><b>Die Decke des Tages</b> — für Tage im Korpus aus allen Flügen dieses Tages gemessen; sonst aus den Oberkanten Deiner eigenen Bärte.</li>
-          <li><b>Wochenende oder nicht</b> — aus dem Datum. An Wochenenden fliegen mehr Leute, die Statistik ist dort dichter.</li>
-          <li><b>Den Schirm</b> — aus der Kopfzeile, wenn wir seine Polare kennen. Sonst fliegt der Avatar einen Zeolite 2 GT.</li>
+          <li><b>Wochenende oder nicht</b> — aus dem Datum. Am Wochenende sind die militärischen Lufträume nicht aktiv.</li>
+          <li><b>Den Schirm</b> — aus der Kopfzeile, wenn wir seine <a href="polaren.html" target="_blank" rel="noopener">Polare</a> kennen. Sonst fliegt der Avatar einen Zeolite 2 GT.</li>
           <li><b>Wo Du gekurbelt hast</b> und wo Du geglitten bist.</li>
         </ul>
       </details>
@@ -961,10 +961,10 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
       <details><summary>What do we read from your IGC?</summary>
         <ul class="neben">
           <li><b>The task</b> — start, three turnpoints, landing: the points that make the flight longest.</li>
-          <li><b>The thermal strength</b> — the median of your climb rate while circling, adjusted for the time of day.</li>
+          <li><b>The thermal strength</b> — for days in the corpus from all flights of that day; otherwise from your flight, the median of your climb rate while circling, adjusted for the time of day.</li>
           <li><b>The ceiling of the day</b> — for days in the corpus measured from all flights of that day; otherwise from the tops of your own thermals.</li>
-          <li><b>Weekend or not</b> — from the date. More people fly at weekends, so the statistic is denser.</li>
-          <li><b>The glider</b> — from the header, if we know its polar. Otherwise the avatar flies a Zeolite 2 GT.</li>
+          <li><b>Weekend or not</b> — from the date. At weekends the military airspaces are not active.</li>
+          <li><b>The glider</b> — from the header, if we know its <a href="polaren.html" target="_blank" rel="noopener">polar</a>. Otherwise the avatar flies a Zeolite 2 GT.</li>
           <li><b>Where you circled</b> and where you glided.</li>
         </ul>
       </details>
@@ -1096,6 +1096,7 @@ function deckelBei(t, i) {
 // Ab 18:00 werden die Bart-Zellen seltener und schwächer als im Mittel ihres Zeitblocks 16–21: Steig-Sekunden je Flug und Viertelstunde
 // relativ zum Block 1.0 (18:00), 0.69 (19:00), 0.42 (20:00), 0.23 (20:30), 0.20 (21:00–21:30); Median-Steigen 1.30 → 1.02 m/s (×0.78 ab 20:00).
 const BART_BIS = 21.5, TAG_ENDE = 22.0, W_ABEND = -0.2;
+const NACHLAUF_AB = 20, NACHLAUF_N = 900;   // unter 20 Ankünften von 100: 900 weitere Läufe (Jörg 17.9.)
 const ABEND_P = [[18.0, 1.0], [19.0, 0.69], [20.0, 0.42], [20.5, 0.23], [21.0, 0.20], [BART_BIS, 0.20]], ABEND_R = [[18.0, 1.0], [20.0, 0.78], [BART_BIS, 0.78]];
 function stueckweise(T, t) { if (t <= T[0][0]) return T[0][1]; for (let k = 1; k < T.length; k++) if (t <= T[k][0]) { const [a, fa] = T[k - 1], [b, fb] = T[k]; return fa + (fb - fa) * (t - a) / (b - a); } return 0; }
 function abendP(t) { return t >= BART_BIS ? 0 : stueckweise(ABEND_P, t); }      // Faktor auf die Trefferquote p der Zelle
@@ -1815,6 +1816,22 @@ function rechnen(aufgabe, opt) {
       zeiten.politik += (tb - ta) / 1000; zeiten.laeufe += (tc - tb) / 1000; weit_politik = true; R = Rw; pol = LSw.pol; Vziel = LSw.Vziel;
       post({art: "stand", text: (LSPR === "de" ? "Ziel unerreichbar (bis km " : "goal unreachable (no way up to km ") + W.s_km[Math.min(block_si + 1, W.N - 1)].toFixed(0) + (LSPR === "de" ? " kein Weg) — Politik «so weit wie möglich» (" : ") — policy «as far as possible» (") + ((tb - ta) / 1000).toFixed(1) + " s), " + Rw.an.length + (LSPR === "de" ? " von " : " of ") + opt.muster + (LSPR === "de" ? " angekommen (" : " arrive (") + ((tc - tb) / 1000).toFixed(1) + " s)"}); }
   }
+  // Nachlauf (Jörg 17.9.2026): kommen weniger als NACHLAUF_AB der 100 Läufe an, steht der gezeigte Lauf auf wenigen Stück und die Quote ist
+  // grob (6 von 100 heisst irgendwo zwischen 2 und 13 %). Dann laufen NACHLAUF_N weitere mit denselben Regeln und frischen Würfeln, und alles —
+  // Quote, Median, Auswahl, Titel — bezieht sich auf die Gesamtzahl. Die Politik wird nicht neu gerechnet; Läufe sind billig (~1 s je 100).
+  let muster = opt.muster;
+  if (R.an.length < NACHLAUF_AB && opt.muster <= 100) {
+    const ta = Date.now();
+    const R2 = laeufe(W, L, pol, opt, {si: 0, qi: MITTE, hi: hi_start, t: 0, boden: true}, NACHLAUF_N, opt.saat + opt.muster, Vziel);
+    const vorher = R.an.length;
+    const alle = R.alle.concat(R2.alle), an = alle.filter(r => isFinite(r.t)).sort((x, y) => x.t - y.t);
+    const gruende = Object.assign({}, R.gruende); for (const g in R2.gruende) gruende[g] = (gruende[g] || 0) + R2.gruende[g];
+    R = {alle, an, gruende}; muster = opt.muster + NACHLAUF_N;
+    zeiten.laeufe += (Date.now() - ta) / 1000;
+    post({art: "stand", text: LSPR === "de"
+      ? `nur ${vorher} von ${opt.muster} angekommen — ${NACHLAUF_N} weitere Läufe: ${R.an.length} von ${muster} (${((Date.now() - ta) / 1000).toFixed(1)} s)`
+      : `only ${vorher} of ${opt.muster} arrived — ${NACHLAUF_N} more runs: ${R.an.length} of ${muster} (${((Date.now() - ta) / 1000).toFixed(1)} s)`});
+  }
   ST = {W, L, pol, opt, aufgabe, hi_start, Vziel};
   // Was die Politik vom nächsten Bart erwartet, je Stunde der erwarteten Uhrzeit: Mittel der Steigrate (mit Tagesfaktor, Tagesgang, Abend) und
   // der Trefferquote über die Bart-Knoten des Korridors — für die Bilder «Fahrt nach Luft» (MacCready-Linie) und «Steigen nach Stunde»
@@ -1839,13 +1856,13 @@ function rechnen(aufgabe, opt) {
       for (let qi = 0; qi < NQ; qi++) { const i = sb * NQ + qi; gmin = Math.min(gmin, W.Gel[i]); let f = 0, c = 0; for (let hi = 0; hi < NH; hi++) { const w = L.Wf[i * NH + hi]; if (w === w) f++; if (L.closed[i * NH + hi] && HS[hi] > W.Gel[i]) c++; } feld = Math.max(feld, f); zu = Math.max(zu, c); }
       block_grund = {gelaende_min: Math.round(gmin), feld_stufen: feld, gesperrt: zu}; }
     const wt = weitester(R.alle, W);
-    return {art: "fertig", ok: false, gruende: R.gruende, block_km: block_si >= 0 ? W.s_km[Math.min(block_si + 1, W.N - 1)] : null, block_grund, weit_politik, wp_gesperrt: wpZu, wp_luft: wpLuft, wp_feld: wpFeld, korridor, dauer_s: (Date.now() - t0) / 1000, durchgaenge: dg,
+    return {art: "fertig", ok: false, gruende: R.gruende, muster, block_km: block_si >= 0 ? W.s_km[Math.min(block_si + 1, W.N - 1)] : null, block_grund, weit_politik, wp_gesperrt: wpZu, wp_luft: wpLuft, wp_feld: wpFeld, korridor, dauer_s: (Date.now() - t0) / 1000, durchgaenge: dg,
             tag_zu_ende: L.t_exp[W.N - 1] >= tagesende, v1, lauf: wt.lauf, weit_km: wt.km, start_hoehe: HS[hi_start], zeiten, start_zeit: opt.t_start, startwahl, erwartung};
   }
   const {k, nw, umweg} = auswahl(R.an, W.achslaenge, W.kx);
   const best = R.an[k];
   const wolke = R.an.slice(0, nw).map(r => r.pfad.map(p => [p[0], p[1]]));
-  return {art: "fertig", ok: true, weit_politik, lauf: {pfad: best.pfad, t: best.t, seed: best.seed, umweg: umweg[k]}, angekommen: R.an.length, muster: opt.muster,
+  return {art: "fertig", ok: true, weit_politik, lauf: {pfad: best.pfad, t: best.t, seed: best.seed, umweg: umweg[k]}, angekommen: R.an.length, muster,
           median_s: R.an[Math.floor(R.an.length / 2)].t, schnellster_s: R.an[0].t, fuenftel_s: [R.an[0].t, R.an[nw - 1].t], gruende: R.gruende, wolke, korridor,
           zonen: L.NZ, zellen: new Set(Array.from(L.Bid).filter(z => z >= 0)).size, dauer_s: (Date.now() - t0) / 1000, t_exp: Array.from(L.t_exp),
           ausfaelle: R.alle.filter(r => !isFinite(r.t)).map(r => [Math.round(W.s_km[Math.min(Math.max(r.si || 0, 0), W.N - 1)]), r.grund, Math.round(r.h || 0), r.letzt || "", r.ug]), zeiten, start_zeit: opt.t_start, startwahl, erwartung};
@@ -2148,6 +2165,11 @@ let WAN = false, W_WERT = 1.0, BASIS = 0;          // W-Regler (an/aus, Wert), B
 // allein ein, fällt er unter seine eigene Eichung und kommt nirgends mehr an (22.4.2025 XFH: 0 von 100). Darum steht sie auf aus, bis die
 // Kampagne gegen Philipp auf der Tages-Skala wiederholt ist. Zum Einschalten: W_EICHUNG_AN auf true.
 const W_EICHUNG_AN = false;
+// Woher die Thermikstärke kommt (Jörg 17.9.2026): "tag" = aus dem Korpus, der Median über alle Flüge dieses Tages — die Stärke des Tages
+// darf nicht vom Piloten abhängen, den man gerade vergleicht (ein schwacher Pilot machte den Tag schwach und bekam einen schwachen Avatar).
+// Liegt der Tag nicht im Korpus, gilt in beiden Fällen der Wert aus dem Flug. "flug" = wie bis 16.9.: immer der Wert aus dem Flug.
+// Zum Rückgängigmachen: W_QUELLE auf "flug".
+const W_QUELLE = "tag";
 const W_EICH_A = 0.34, W_EICH_B = 0.65;
 function wTagVon(wFlug) { return !W_EICHUNG_AN ? Math.round(Math.min(2.0, Math.max(0.3, wFlug)) * 10) / 10
   : Math.round(Math.min(2.0, Math.max(0.3, W_EICH_A * wFlug + W_EICH_B)) * 10) / 10; }
@@ -2982,12 +3004,13 @@ function wVermerk() {                        // welches W dieser Lauf benutzt �
   const de = LANG === "de";
   if (!WAN) return de ? "Thermik W: alle Tage gemischt · Feld «alle»" : "Thermals W: all days mixed · field “all”";
   const ausIgc = PILOT && PILOT.W != null && Math.abs(PILOT.W - W_WERT) < 0.05;
-  if (ausIgc && PILOT.W_flug != null)
-    return W_EICHUNG_AN
-      ? (de ? `Thermik W ${W_WERT.toFixed(1)} m/s (der Tag) — aus der IGC gerechnet; der Flug selbst steigt im Kreisen ${PILOT.W_flug.toFixed(1)} m/s · Feld ${W_SEL}`
-            : `Thermals W ${W_WERT.toFixed(1)} m/s (the day) — derived from the IGC; the flight itself climbs ${PILOT.W_flug.toFixed(1)} m/s while circling · field ${W_SEL}`)
-      : (de ? `Thermik W ${W_WERT.toFixed(1)} m/s — aus der IGC (Steigen des Flugs im Kreisen; Eichung auf den Tag ist aus) · Feld ${W_SEL}`
-            : `Thermals W ${W_WERT.toFixed(1)} m/s — from the IGC (the flight's circling climb; day calibration is off) · field ${W_SEL}`);
+  const flug = PILOT && PILOT.W_flug != null ? (de ? `; Dein Flug steigt im Kreisen ${PILOT.W_flug.toFixed(1)} m/s` : `; your flight climbs ${PILOT.W_flug.toFixed(1)} m/s while circling`) : "";
+  if (ausIgc && PILOT.W_quelle === "tag")
+    return de ? `Thermik W ${W_WERT.toFixed(1)} m/s — der Tag aus dem Korpus, alle Flüge dieses Tages${flug} · Feld ${W_SEL}`
+              : `Thermals W ${W_WERT.toFixed(1)} m/s — the day from the corpus, all flights of that day${flug} · field ${W_SEL}`;
+  if (ausIgc && PILOT.W_quelle === "flug")
+    return de ? `Thermik W ${W_WERT.toFixed(1)} m/s — aus Deinem Flug, weil der Tag nicht im Korpus liegt · Feld ${W_SEL}`
+              : `Thermals W ${W_WERT.toFixed(1)} m/s — from your flight, because the day is not in the corpus · field ${W_SEL}`;
   return de ? `Thermik W ${W_WERT.toFixed(1)} m/s — ${ausIgc ? "aus der IGC" : "von Hand gesetzt"} · Feld ${W_SEL}`
             : `Thermals W ${W_WERT.toFixed(1)} m/s — ${ausIgc ? "from the IGC" : "set by hand"} · field ${W_SEL}`;
 }
@@ -3357,8 +3380,12 @@ async function igcLaden(file) {
   // W des Flugs, auf den Tagesgang normiert (Gang des Korpus-Tages, sonst der Korpus-Gang)
   const tgTag = tagesDecke(I.datum), gangW = TAGE ? gangVoll(null) : null;      // Korpus-Gang (der Tag selbst ist an den Rändern zu unsicher)
   const Wp = igcW(I, A.i0, A.i1, gangW, A.start.zeit), Wflug = Wp ? Wp[0] : null;
-  const Wf = Wflug == null ? null : wTagVon(Wflug);            // der Flug misst den Piloten — der Regler will den Tag (Jörg 16.9.)
-  if (Wf != null) { wSetzen(true, Wf); PILOT.W = Wf; PILOT.W_flug = Wflug; PILOT.W_roh = Wp[1]; }
+  const eTag = TAGE && TAGE.tage ? TAGE.tage[I.datum.replace(/-/g, "")] : null;      // Korpus-Tag: [n_fluege, W_tag, …]
+  const Wtag = eTag && typeof eTag[1] === "number" ? eTag[1] : null;
+  let Wf = null, Wquelle = "";
+  if (W_QUELLE === "tag" && Wtag != null) { Wf = Math.round(Math.min(2.0, Math.max(0.3, Wtag)) * 10) / 10; Wquelle = "tag"; }
+  else if (Wflug != null) { Wf = wTagVon(Wflug); Wquelle = "flug"; }
+  if (Wf != null) { wSetzen(true, Wf); PILOT.W = Wf; PILOT.W_flug = Wflug; PILOT.W_tag = Wtag; PILOT.W_quelle = Wquelle; PILOT.W_roh = Wp ? Wp[1] : null; }
   // Decke des Tages: von einem Korpus-Tag die gemessene (P90 der Bart-Oberkanten aller Flüge, je Stunde); sonst die Modell-Decke aus W und
   // Monat mit Warnung — der Nutzer muss sie selbst eruieren und mit dem Basis-Regler einstellen (Jörg 15.9.). Der Regler steht auf 0 und verschiebt die Decke.
   const bs = null;
@@ -3366,7 +3393,9 @@ async function igcLaden(file) {
   if (!tg) tg = flugDecke(I, A);                        // der Flug bringt seine Decke selbst mit (Jörg 16.9.)
   if (!tg) tg = modellDecke(WAN ? W_WERT : (PILOT.W != null ? PILOT.W : 1.0), +I.datum.slice(5, 7));
   DECKEL_PROFIL = tg ? tg.profil : null; DECKEL_INFO = tg; BASIS = 0;
-  const wq = Wf == null ? "" : (LANG === "de" ? ` · Tag W ${Wf.toFixed(1)} m/s, aus dem Flug gerechnet (der Flug steigt ${Wflug.toFixed(1)} m/s)` : ` · day W ${Wf.toFixed(1)} m/s, derived from the flight (the flight climbs ${Wflug.toFixed(1)} m/s)`);
+  const wq = Wf == null ? "" : Wquelle === "tag"
+    ? (LANG === "de" ? ` · W ${Wf.toFixed(1)} m/s aus dem Korpus (alle Flüge des Tages)` : ` · W ${Wf.toFixed(1)} m/s from the corpus (all flights of the day)`)
+    : (LANG === "de" ? ` · W ${Wf.toFixed(1)} m/s aus dem Flug (Tag nicht im Korpus)` : ` · W ${Wf.toFixed(1)} m/s from the flight (day not in the corpus)`);
   document.getElementById("bquelle").textContent = (!tg ? "" : tg.modell ? (LANG === "de" ? `Modell-Decke (W ${tg.W.toFixed(1)}, Monat ${tg.monat}): ${tg.text} — bitte prüfen` : `model ceiling (W ${tg.W.toFixed(1)}, month ${tg.monat}): ${tg.text} — please check`)
     : tg.ausFlug ? (LANG === "de" ? `Decke aus dem Flug selbst (${tg.n} Bärte): ${tg.text}` : `ceiling from the flight itself (${tg.n} climbs): ${tg.text}`)
     : (LANG === "de" ? `Decke des Tages aus ${tg.n} Flügen: ${tg.text}` : `day's ceiling from ${tg.n} flights: ${tg.text}`)) + wq;
