@@ -1007,8 +1007,20 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
 // Nachrichten:  {art:"daten", …}  einmal die Datenschichten;  {art:"aufgabe", aufgabe, opt}  rechnet Politik + Läufe;
 //               {art:"abhier", la, lo, h, t}  Läufe ab einem Zustand (Echtzeit-Avatar).  Antworten: {art:"fertig"|"abhier"|"stand"|"fehler", …}
 "use strict";
-const HMIN = 1400, HMAX = 4500, DH = 20, NH = (HMAX - HMIN) / DH + 1;
-const HS = new Float64Array(NH); for (let i = 0; i < NH; i++) HS[i] = HMIN + i * DH;
+// HMIN (Jörg 17.9.2026, 423-km-Flug: der Avatar «landete» bei km 408 in 1400 m, 411 m über dem Hang, 15 km vor Brig): die Welt des Avatars
+// endete an der untersten Feldschicht (1400 m) — ein Gleitzug darunter galt als «abgesoffen», Ankunft brauchte 1400 m über dem Landeplatz.
+// Jetzt reicht sie bis 500 m (Talboden Sion 480 m): Endanflug ins Tal und tiefes Wiedereinsteigen am Hang sind möglich. Unter 1400 m gibt es
+// kein gemessenes Feld; feldWert nimmt dort die 1400-m-Schicht (Schichtindex geklemmt). Kostet ~29 % mehr Zustände, nur über Talböden gerechnet.
+// Der Boden richtet sich nach der Aufgabe (Jörg: «wieso nicht Meereshöhe — wir wollen dereinst die Alpen»): HMIN = tiefstes Gelände im
+// Korridor, auf 100 m abgerundet, minus 100 m, nie unter 0. Im Wallis ~400–600 m, im Flachland 0 — ohne Zustände zu verschwenden. Wird je
+// Aufgabe in rechnen() gesetzt (bodenSetzen), bevor irgendetwas gerechnet wird; alle Rechnungen lesen HMIN/NH/HS erst danach.
+let HMIN = 500; const HMAX = 4500, DH = 20; let NH = (HMAX - HMIN) / DH + 1;
+let HS = new Float64Array(NH); for (let i = 0; i < NH; i++) HS[i] = HMIN + i * DH;
+function bodenSetzen(gelMin) {
+  const h = Math.max(0, Math.floor(gelMin / 100) * 100 - 100);
+  HMIN = h; NH = (HMAX - HMIN) / DH + 1; HS = new Float64Array(NH); for (let i = 0; i < NH; i++) HS[i] = HMIN + i * DH;
+  DICHTE = null;                                     // Dichte je Stufe neu (sinkBei)
+}
 let NQ = 25, MITTE = 12;                        // Querspuren (aus meta.avatar.nq: 49 = ±9.6 km, damit der Avatar die Talseite wählen kann)
 const DQ = 400, SCHRITT = 500, RAND = 30;
 // Luftraum G: das Höhenband vom Boden bis 600 m über Grund gilt über der ganzen Schweiz und wird von den kontrollierten Räumen
@@ -1089,7 +1101,7 @@ function PhiInv(p) {                                                 // Acklam, 
   const q = p - 0.5, r = q * q;
   return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
 }
-const SV = new Float64Array(NH + 1);                                 // Überlebensfunktion der Bart-Oberkante je Stufe (je Knoten neu gefüllt)
+const SV = new Float64Array(HMAX / DH + 2);                          // gross genug für jeden Boden (HMIN 0 … )                                 // Überlebensfunktion der Bart-Oberkante je Stufe (je Knoten neu gefüllt)
 function obenVerteilung(mu, sig, lo_i, jmax) {                       // SV[k] = P(T >= HS[k]), auf jmax gestutzt (SV[jmax + 1] = 0)
   const qEnd = 1 - Phi((HS[jmax] + DH - mu) / sig), norm = 1 / Math.max(1e-9, 1 - qEnd);
   for (let k = lo_i; k <= jmax; k++) SV[k] = Math.max(0, (1 - Phi((HS[k] - mu) / sig) - qEnd) * norm);
@@ -1193,6 +1205,7 @@ function welt(achse, wegpunkte) {
   const wp_si = wegpunkte.map(k => { const c = pts.findIndex(p => p.seg === k); return c >= 0 ? c : N - 1; });
   let achslaenge = 0; for (let k = 0; k < achse.length - 1; k++) achslaenge += Math.hypot((achse[k + 1][0] - achse[k][0]) * KY, (achse[k + 1][1] - achse[k][1]) * kx);
   const Gel = new Float64Array(N * NQ); for (let i = 0; i < N * NQ; i++) Gel[i] = gelBei(P_la[i], P_lo[i]);
+  { let gmin = Infinity; for (let i = 0; i < N * NQ; i++) if (Gel[i] === Gel[i] && Gel[i] < gmin) gmin = Gel[i]; bodenSetzen(isFinite(gmin) ? gmin : 0); }   // Boden der Rechnung: vor allem, was NH/HS braucht
   const wpset = new Set(wp_si);
   const Dst = new Float64Array((N - 1) * NQ * NM).fill(NaN), Gm = new Float64Array((N - 1) * NQ * NM * 3), Ri = new Float64Array((N - 1) * NQ * NM * 2);
   for (let si = 0; si < N - 1; si++) for (let qi = 0; qi < NQ; qi++) for (let k = 0; k < NM; k++) {
@@ -1331,6 +1344,9 @@ function lage(W, t_exp, opt) {
 // Wert einer Landung: der Landemalus, in der «so weit wie möglich»-Politik (opt.weit, wenn das Ziel unerreichbar ist) dazu die fehlende Strecke
 // zu WEIT_S_JE_KM (120 s je km, 30 km/h): so zieht es den Avatar nach vorn, statt dass alle Zustände gleich wertlos sind und er am Start liegen bleibt
 const WEIT_S_JE_KM = 120;
+// (17.9. spät ausprobiert und zurückgenommen: «Kilometer zählen nur über landbarem Gelände» — Strafe fürs Enden über 2400 m. Beim XFH-Flug
+//  wich der Avatar damit von der Achse nach Zermatt aus und endete auf dem Gornergletscher, weil W3 selbst auf dem Monte Rosa liegt und die
+//  ganze Massiv-Region als «nicht landbar» galt. Eine solche Regel braucht eine Kampagne über mehrere Flüge, nicht einen Abendversuch.)
 function loese(W, L, opt) {
   const N = W.N, TLs = opt.landemalus_min * 60, sicht = opt.sicht, S = opt.POL_S, ankunft = opt.ankunft_min;
   const TL = new Float64Array(N); for (let si = 0; si < N; si++) TL[si] = TLs + (opt.weit ? (W.s_km[N - 1] - W.s_km[si]) * WEIT_S_JE_KM : 0);
@@ -1744,7 +1760,8 @@ function auswahl(an, achslaenge, kx) {
 function rechnen(aufgabe, opt) {
   const t0 = Date.now();
   const W = welt(aufgabe.achse, aufgabe.wegpunkte);
-  post({art: "stand", text: (LSPR === "de" ? "Korridor: " + W.N + " Schritte, " : "Corridor: " + W.N + " steps, ") + (W.achslaenge / 1000).toFixed(0) + " km"});
+  opt.POL_S = polareSinken(opt.polare[0], opt.polare[1]);                          // Sinktabelle passt zum Boden (welt hat NH/HS gesetzt)
+  post({art: "stand", text: (LSPR === "de" ? "Korridor: " + W.N + " Schritte, " : "Corridor: " + W.N + " steps, ") + (W.achslaenge / 1000).toFixed(0) + " km" + (LSPR === "de" ? " · Boden der Rechnung " : " · floor of the computation ") + HMIN + " m"});
   FELD_HEB = Math.max(0, Math.round((opt.basis || 0) / DH));
   DECKEL = opt.deckel_profil && opt.deckel_profil.length === 24 && opt.deckel_profil.every(v => v === v) ? Float64Array.from(opt.deckel_profil) : null; DECKEL_PLUS = opt.basis || 0;
   if (DECKEL) post({art: "stand", text: (LSPR === "de" ? "Decke " : "Ceiling ") + [9, 12, 15, 18].map(h => h + " h " + Math.round(DECKEL[h])).join(" · ") + " m"});
@@ -2675,7 +2692,7 @@ function zustandAvatar(pfad, tj) {
 const KREIS_M = 35, KREIS_S = 20;
 // Halten in der Luft (Zeilen «H», seit 15.9. spät statt «Warten»: der Avatar sinkt dabei, siehe avatar.js): dargestellt als weite Kreise, 80 m alle 40 s
 const HALT_M = 80, HALT_S = 40;
-// Landung (Jörg 15.9.2026): die Welt des Avatars endet bei 1400 m (unterste Feldschicht), «angekommen» heisst: am Ziel über dem Landeplatz.
+// Landung (Jörg 15.9.2026; seit 17.9. reicht die Welt des Avatars bis 500 m): «angekommen» heisst: am Ziel über dem Landeplatz.
 // Damit er nicht 700 m über Brig stehen bleibt, geht es zum Schluss sichtbar hinunter — Steilspirale (8 m/s) bis 150 m über dem Landeplatz,
 // dann die Landevolte mit 35 km/h: 100 m zur Seite, 350 m Gegenanflug, Queranflug, 350 m Endanflug in der Anflugrichtung auf den Landepunkt.
 // Nur Darstellung: Ankunftszeit, Rangliste und Kampagne bleiben; die Zeilen heissen «L» (1 Spirale, 2 Volte, 3 gelandet).
@@ -2695,6 +2712,29 @@ function spurMitKreisen(pfad) {
     out.push(auf(tb, b[4]));
   }
   return out;
+}
+// Warum endete der gezeigte Lauf? (Jörg 17.9., XFH: «es tragen Bärte noch länger, einfach nicht da, wo er ist») — der nächste Bart im Umkreis
+// von WARUM_KM mit seiner Einstiegsschwelle (100 m unter dem Einstieg der Zelle, wie der Avatar rechnet) und die Höhe, mit der er dort vorbeikam.
+const WARUM_KM = 6;
+function warumEnde(m) {
+  if (!m.lauf || !m.lauf.pfad || !m.lauf.pfad.length || !BAERTE) return "";
+  const pf = m.lauf.pfad, e = pf[pf.length - 1], de = LANG === "de", B = BAERTE;
+  const tEnde = (m.t0h != null ? m.t0h : AUFG.start.zeit) + e[3] / 3600; if (tEnde >= BART_BIS) return de ? "Um diese Zeit trägt kein Bart mehr." : "At this hour no thermal works any more.";
+  const bk = blockIndex(tEnde), kmVon = (la, lo, la2, lo2) => Math.hypot((la - la2) * KY, (lo - lo2) * KX) / 1000;
+  const schluss = pf.filter(p => p[3] >= e[3] - 2700);                                 // die letzten 45 Minuten des Laufs
+  let best = null;
+  for (let i = 0; i < B.cx.length; i++) { const la = latVon(B.cy[i]), lo = lonVon(B.cx[i]), dEnde = kmVon(la, lo, e[0], e[1]); if (dEnde > WARUM_KM) continue;
+    const q = B.bl[i][bk]; if (q[0] < 3) continue;                                   // nur Zellen, die in diesem Zeitblock gemessen tragen
+    let dNah = Infinity, hNah = e[2]; for (const p of schluss) { const d = kmVon(la, lo, p[0], p[1]); if (d < dNah) { dNah = d; hNah = p[2]; } }
+    if (!best || dNah < best.dNah) best = {la, lo, dEnde, dNah, hNah, schwelle: q[8] - 100, n: q[0], steig: q[5] / 100}; }
+  if (!best) return de ? `Kein Bart, der um diese Zeit trägt, im Umkreis von ${WARUM_KM} km.` : `No thermal working at this hour within ${WARUM_KM} km.`;
+  const az = (Math.atan2((best.lo - e[1]) * KX, (best.la - e[0]) * KY) * 180 / Math.PI + 360) % 360, R = de ? ["N", "NO", "O", "SO", "S", "SW", "W", "NW"] : ["N", "NE", "E", "SE", "S", "SW", "W", "NW"], ri = R[Math.round(az / 45) % 8];
+  const zuTief = best.hNah < best.schwelle, nah = best.dNah <= 1.5;
+  const wo = de ? `Nächster Bart, der um diese Zeit trägt: ${best.dEnde.toFixed(1)} km ${ri} vom Ende (${best.n} Bärte im Block, ${best.steig.toFixed(1)} m/s, Einstieg ab ${Math.round(best.schwelle)} m)`
+                : `Nearest thermal working at this hour: ${best.dEnde.toFixed(1)} km ${ri} of the end (${best.n} climbs in this block, ${best.steig.toFixed(1)} m/s, entry from ${Math.round(best.schwelle)} m)`;
+  const wie = de ? (nah ? ` — er kam dort mit ${Math.round(best.hNah)} m vorbei${zuTief ? ": zu tief" : ""}.` : ` — er kam ihm nicht näher als ${best.dNah.toFixed(1)} km, damals auf ${Math.round(best.hNah)} m${zuTief ? ", zu tief" : ""}.`)
+                 : (nah ? ` — he passed it at ${Math.round(best.hNah)} m${zuTief ? ": too low" : ""}.` : ` — he never came closer than ${best.dNah.toFixed(1)} km, then at ${Math.round(best.hNah)} m${zuTief ? ", too low" : ""}.`);
+  return wo + wie;
 }
 function landungAnhaengen(pfad) {
   const n = pfad.length; if (n < 2 || pfad[n - 1][4] === "L") return pfad;
@@ -3238,6 +3278,7 @@ function statusText() {
       if (m.block_km != null) txt += de ? ` Im Mittel zu weit für den Tag: vom Start bis km ${m.block_km.toFixed(0)} gibt es keinen Weg, der rechtzeitig ankäme — der Avatar flog darum «so weit wie möglich».` : ` On average too far for the day: from the start to km ${m.block_km.toFixed(0)} there is no way that would arrive in time — so the avatar flew «as far as possible».`;
     }
     if (m.lauf && m.weit_km > 0) { const uz = AUFG.start.zeit + m.lauf.t / 3600, hh = Math.floor(uz), mm = Math.round((uz - hh) * 60); txt += de ? ` Gezeigt: der weiteste Lauf, bis km ${m.weit_km} (${grText(m.lauf.grund)}, ${hh}:${String(mm).padStart(2, "0")}).` : ` Shown: the run that got furthest, to km ${m.weit_km} (${grText(m.lauf.grund)}, ${hh}:${String(mm).padStart(2, "0")}).`; }
+    { const w = warumEnde(m); if (w) txt += " " + w; }
     s.textContent = txt; return;
   }
   let aus = "";
