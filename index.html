@@ -930,6 +930,7 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
         <p class="neben">Zuerst wird ein Korridor um Deine Spur gelegt, ±9,6 km breit, in Schritten von 500 m. Darin rechnet der Avatar für jeden Ort, jede Höhe und jede Uhrzeit aus, was sich am meisten lohnt: weitergleiten, schneller fliegen, oder stehen bleiben und kurbeln.</p>
         <p class="neben">Die Startzeit wählt er selbst — typisch für diese Thermikstärke, früher bei langen Aufgaben.</p>
         <p class="neben">Dann werden 100 Tage gewürfelt. Ob ein Bart gerade läuft, entscheidet der Zufall aus der gemessenen Trefferquote — wie in echt. Der Avatar weiss vorher nicht, welcher Bart trägt; er probiert, und manchmal geht es schief. Kommen weniger als 20 der 100 an, werden 900 weitere gewürfelt, damit die Zahlen auf 1000 stehen. Gezeigt wird der direkteste Lauf des schnellsten Fünftels.</p>
+        <p class="neben">Wie viele Läufe ankommen, ist die Schwierigkeit Deines Flugs: ab der Hälfte normal, ab einem Fünftel anspruchsvoll, ab einem Zwanzigstel schwer, darunter sehr schwer. Gleiche Regeln für jeden Flug — kommen von 1000 nur wenige an, war Dein Flug besser als der Durchschnittstag hergab. Der gezeigte Lauf ist dann einer der wenigen, die durchkamen, kein Massstab.</p>
       </details>
 
       <details><summary>Wo sind die Grenzen?</summary>
@@ -975,6 +976,7 @@ select, input[type=number], input[type=text] { font: inherit; font-size: 12px; b
         <p class="neben">First a corridor is laid around your track, ±9.6 km wide, in steps of 500 m. Inside it the avatar works out, for every place, height and time of day, what pays off most: glide on, fly faster, or stop and circle.</p>
         <p class="neben">It picks its own start time — typical for this thermal strength, earlier for long tasks.</p>
         <p class="neben">Then 100 days are drawn. Whether a thermal is working is decided at random from the measured hit rate — as in real life. The avatar does not know in advance which one will carry; it tries, and sometimes it fails. If fewer than 20 of the 100 arrive, 900 more are drawn so the numbers rest on 1000. Shown is the most direct run of the fastest fifth.</p>
+        <p class="neben">How many runs arrive is the difficulty of your flight: from half normal, from a fifth demanding, from a twentieth hard, below that very hard. Same rules for every flight — if only a few of 1000 arrive, your flight was better than the average day allowed. The run shown is then one of the few that made it, not a yardstick.</p>
       </details>
 
       <details><summary>Where are the limits?</summary>
@@ -1772,12 +1774,17 @@ function rechnen(aufgabe, opt) {
       zeiten.lage += (tb - ta) / 1000; zeiten.politik += (tc - tb) / 1000;
       const V0 = LSk.V0[MITTE * NH + hi_start];
       startwahl.push({zeit: ts, erwartet_min: V0 / 60, L: Lk, LS: LSk, t_exp: te, v1: v10});
-      post({art: "stand", text: (LSPR === "de" ? "Start " : "start ") + Math.floor(ts) + ":" + String(Math.round((ts % 1) * 60)).padStart(2, "0") + (LSPR === "de" ? " → erwartet " : " → expected ") + (V0 / 60).toFixed(0) + " min"});
+      // V0 = Landemalus heisst: im Mittel kommt von diesem Start aus kein Lauf an (Jörg 17.9.: «erwartet 720 min» war unverständlich)
+      const keine = V0 >= opt.landemalus_min * 60 - 1e-6;
+      post({art: "stand", text: (LSPR === "de" ? "Start " : "start ") + Math.floor(ts) + ":" + String(Math.round((ts % 1) * 60)).padStart(2, "0")
+        + (keine ? (LSPR === "de" ? " → im Mittel keine Ankunft" : " → on average no arrival") : (LSPR === "de" ? " → erwartet " : " → expected ") + (V0 / 60).toFixed(0) + " min")});
     }
     let best = startwahl[0]; for (const k of startwahl) if (k.erwartet_min < best.erwartet_min - 10) best = k;   // später nur, wenn klar besser (10 min): die Erwartungen streuen
+    const alleKeine = startwahl.every(k => k.erwartet_min >= opt.landemalus_min - 1e-6);
     opt.t_start = best.zeit; aufgabe.start.zeit = best.zeit; t_exp = best.t_exp; v1 = best.v1; vorab = {L: best.L, LS: best.LS};
     startwahl.forEach(k => { delete k.L; delete k.LS; delete k.t_exp; });
-    post({art: "stand", text: (LSPR === "de" ? "Startzeit: " : "start time: ") + Math.floor(best.zeit) + ":" + String(Math.round((best.zeit % 1) * 60)).padStart(2, "0") + (LSPR === "de" ? " gewählt" : " chosen")});
+    post({art: "stand", text: (LSPR === "de" ? "Startzeit: " : "start time: ") + Math.floor(best.zeit) + ":" + String(Math.round((best.zeit % 1) * 60)).padStart(2, "0") + (LSPR === "de" ? " gewählt" : " chosen")
+      + (alleKeine ? (LSPR === "de" ? " (alle Starts gleich — die früheste)" : " (all starts equal — the earliest)") : "")});
   }
   const t1 = Date.now();
   post({art: "stand", text: (LSPR === "de" ? "Korridor gebaut (" : "corridor built (") + zeiten.korridor.toFixed(1) + " s)"});
@@ -1817,7 +1824,11 @@ function rechnen(aufgabe, opt) {
     if (block_si >= 0) { const ta = Date.now(); const LSw = loese(W, L, Object.assign({}, opt, {weit: true})); const tb = Date.now();
       const Rw = laeufe(W, L, LSw.pol, opt, {si: 0, qi: MITTE, hi: hi_start, t: 0, boden: true}, opt.muster, opt.saat, LSw.Vziel); const tc = Date.now();
       zeiten.politik += (tb - ta) / 1000; zeiten.laeufe += (tc - tb) / 1000; weit_politik = true; R = Rw; pol = LSw.pol; Vziel = LSw.Vziel;
-      post({art: "stand", text: (LSPR === "de" ? "Ziel unerreichbar (bis km " : "goal unreachable (no way up to km ") + W.s_km[Math.min(block_si + 1, W.N - 1)].toFixed(0) + (LSPR === "de" ? " kein Weg) → Politik «so weit wie möglich»: " : ") → policy «as far as possible»: ") + Rw.an.length + (LSPR === "de" ? " von " : " of ") + opt.muster + (LSPR === "de" ? " angekommen" : " arrive")}); }
+      // Wording (Jörg 17.9.): «unerreichbar» war falsch — im Mittel zu weit, nicht unmöglich; einzelne Läufe kommen mit guten Würfeln trotzdem an
+      const bkm = W.s_km[Math.min(block_si + 1, W.N - 1)].toFixed(0);
+      post({art: "stand", text: LSPR === "de"
+        ? `Im Mittel zu weit für den Tag: vom Start bis km ${bkm} kein Weg, der rechtzeitig ankäme — die normale Politik gibt auf → Avatar fliegt «so weit wie möglich»: ` + (Rw.an.length ? `${Rw.an.length} von ${opt.muster} kommen trotzdem an` : `keiner von ${opt.muster} kommt an`)
+        : `On average too far for the day: from the start to km ${bkm} no way that would arrive in time — the normal policy gives up → avatar flies «as far as possible»: ` + (Rw.an.length ? `${Rw.an.length} of ${opt.muster} arrive anyway` : `none of ${opt.muster} arrives`)}); }
   }
   // Nachlauf (Jörg 17.9.2026): kommen weniger als NACHLAUF_AB der 100 Läufe an, steht der gezeigte Lauf auf wenigen Stück und die Quote ist
   // grob (6 von 100 heisst irgendwo zwischen 2 und 13 %). Dann laufen NACHLAUF_N weitere mit denselben Regeln und frischen Würfeln, und alles —
@@ -3047,7 +3058,7 @@ function ergebnisZeilen() {                  // die lange Ergebniszeile in kurze
   const kopf = document.getElementById("status").textContent; if (!kopf) return [];
   const raus = new Set([PILOT && PILOT.datei || ""]), st = [];
   for (const a of kopf.split(" · ")) for (const b of a.split(/(?<=[.!?])\s+(?=[A-ZÄÖÜ«0-9])/)) for (const c of (b.length > 100 ? b.split(" — ") : [b])) { const x = c.trim().replace(/\.$/, ""); if (x && !raus.has(x)) st.push(x); }
-  const fett = x => x.startsWith(t("st_avatar") + ":") || /^(Kein Lauf|No run)/.test(x);
+  const fett = x => x.startsWith(t("st_avatar") + ":") || /^(Schwierigkeit|Difficulty):/.test(x) || /^(Kein Lauf|No run)/.test(x);
   return st.map(x => [x, fett(x)]);
 }
 function protokollZeigen() {
@@ -3137,10 +3148,10 @@ function statusText() {
       txt += de ? "Die Aufgabe ist zu lang für den Tag: selbst mit 45 km/h käme der Avatar nach 22:00 an. Früher starten oder die Aufgabe kürzen." : "The task is too long for the day: even at 45 km/h the avatar would arrive after 22:00. Start earlier or shorten the task.";
     } else {
       const ge = Object.entries(m.gruende || {}).sort((x, y) => y[1] - x[1]), gr = ge.slice(0, 3).map(([k, v]) => `${v}× ${grText(k)}`).join(", ") + (ge.length > 3 ? ", …" : "");
-      txt += de ? `Kein Lauf kommt ganz an — alle ${n} Läufe enden vorher (${gr}).` : `No run makes it all the way — all ${n} runs end before the goal (${gr}).`;
+      txt += schwierigkeit(0, n) + ". " + (de ? `Kein Lauf kommt ganz an — alle ${n} Läufe enden vorher (${gr}).` : `No run makes it all the way — all ${n} runs end before the goal (${gr}).`);
       // block_km: vom Start bis dorthin gibt es keinen Zustand mit einem Weg, der bis 22:00 ankäme (erst von dort aus reichte die Zeit) — der frühere Satz
       // «Ab km X findet der Avatar keinen Weg mehr» sagte das Gegenteil (Jörg 15.9. spät, Rekordflug 25.5.2026: «wir sagen, dass wir bis 382 km eine Lösung finden»)
-      if (m.block_km != null) txt += de ? ` Vom Start bis km ${m.block_km.toFixed(0)} gibt es keinen Weg, der bis 22:00 ankäme — die Aufgabe ist für den Avatar zu lang für den Tag; er fliegt darum «so weit wie möglich».` : ` From the start to km ${m.block_km.toFixed(0)} there is no way that would arrive by 22:00 — the task is too long for the avatar's day; so he flies «as far as possible».`;
+      if (m.block_km != null) txt += de ? ` Im Mittel zu weit für den Tag: vom Start bis km ${m.block_km.toFixed(0)} gibt es keinen Weg, der rechtzeitig ankäme — der Avatar flog darum «so weit wie möglich».` : ` On average too far for the day: from the start to km ${m.block_km.toFixed(0)} there is no way that would arrive in time — so the avatar flew «as far as possible».`;
     }
     if (m.lauf && m.weit_km > 0) { const uz = AUFG.start.zeit + m.lauf.t / 3600, hh = Math.floor(uz), mm = Math.round((uz - hh) * 60); txt += de ? ` Gezeigt: der weiteste Lauf, bis km ${m.weit_km} (${grText(m.lauf.grund)}, ${hh}:${String(mm).padStart(2, "0")}).` : ` Shown: the run that got furthest, to km ${m.weit_km} (${grText(m.lauf.grund)}, ${hh}:${String(mm).padStart(2, "0")}).`; }
     s.textContent = txt; return;
@@ -3151,8 +3162,22 @@ function statusText() {
     const top = Object.entries(h).sort((x, y) => y[1] - x[1])[0];
     aus = LANG === "de" ? ` ${m.ausfaelle.length} landen, am häufigsten bei km ${top[0]}–${+top[0] + 5}.` : ` ${m.ausfaelle.length} land, most often at km ${top[0]}–${+top[0] + 5}.`;
   }
-  const weit = m.weit_politik ? (LANG === "de" ? "Ziel für die normale Politik unerreichbar (zu lang für den Tag) — Politik «so weit wie möglich» · " : "goal unreachable for the normal policy (too long for the day) — policy «as far as possible» · ") : "";
-  s.textContent = igc + (AUFG && AUFG.geaendert ? (LANG === "de" ? "Aufgabe verschoben · " : "task moved · ") : "") + weit + `${t("st_avatar")}: ${m.angekommen} ${t("st_von")} ${m.muster} ${t("st_laeufen")} ${(m.median_s / 60).toFixed(0)} min · ${t("st_gezeigt")} ${(m.lauf.t / 60).toFixed(0)} min (${t("st_umweg")} ${m.lauf.umweg.toFixed(2)}) · ${(m.dauer_s).toFixed(0)} s ${LANG === "de" ? "gerechnet" : "computed"}${m.zeiten ? ` (${LANG === "de" ? "Korridor" : "corridor"} ${m.zeiten.korridor.toFixed(0)}, ${LANG === "de" ? "Lage" : "state"} ${m.zeiten.lage.toFixed(0)}, ${LANG === "de" ? "Politik" : "policy"} ${m.zeiten.politik.toFixed(0)}, ${LANG === "de" ? "Läufe" : "runs"} ${m.zeiten.laeufe.toFixed(0)} s)` : ""}.` + aus;
+  // Schwierigkeit (Jörg 17.9.): die Ankunftsquote ist eine Note für den Flug, keine Aussage über den Avatar — gleiche Regeln für jeden Flug.
+  // Kommen wenige an (unter 20 %), ist der gezeigte Lauf einer der wenigen, die durchkamen — kein Rennen «Avatar gegen Pilot» mehr.
+  const de = LANG === "de", wenige = m.angekommen / m.muster < 0.2;
+  const weit = m.weit_politik ? (de ? "Im Mittel zu weit für den Tag — Avatar flog «so weit wie möglich» · " : "On average too far for the day — avatar flew «as far as possible» · ") : "";
+  const gezeigt = `${(m.lauf.t / 60).toFixed(0)} min (${t("st_umweg")} ${m.lauf.umweg.toFixed(2)})`;
+  const avatar = wenige
+    ? (de ? `gezeigt: einer der ${m.angekommen} Läufe, die durchkamen — ${gezeigt}` : `shown: one of the ${m.angekommen} runs that made it — ${gezeigt}`)
+    : `${t("st_avatar")}: Median ${(m.median_s / 60).toFixed(0)} min · ${t("st_gezeigt")} ${gezeigt}`;
+  s.textContent = igc + (AUFG && AUFG.geaendert ? (de ? "Aufgabe verschoben · " : "task moved · ") : "") + weit + schwierigkeit(m.angekommen, m.muster) + " · " + avatar
+    + ` · ${(m.dauer_s).toFixed(0)} s ${de ? "gerechnet" : "computed"}${m.zeiten ? ` (${de ? "Korridor" : "corridor"} ${m.zeiten.korridor.toFixed(0)}, ${de ? "Lage" : "state"} ${m.zeiten.lage.toFixed(0)}, ${de ? "Politik" : "policy"} ${m.zeiten.politik.toFixed(0)}, ${de ? "Läufe" : "runs"} ${m.zeiten.laeufe.toFixed(0)} s)` : ""}.` + aus;
+}
+// Schwierigkeit des Flugs aus der Ankunftsquote: ab 50 % normal, 20–50 % anspruchsvoll, 5–20 % schwer, darunter sehr schwer
+function schwierigkeit(an, muster) {
+  const q = muster ? an / muster : 0, de = LANG === "de";
+  const stufe = q >= 0.5 ? "normal" : q >= 0.2 ? (de ? "anspruchsvoll" : "demanding") : q >= 0.05 ? (de ? "schwer" : "hard") : (de ? "sehr schwer" : "very hard");
+  return de ? `Schwierigkeit: ${an} von ${muster} Läufen kommen an — ${stufe}` : `Difficulty: ${an} of ${muster} runs arrive — ${stufe}`;
 }
 
 // ------------------------------------------------------------ Aufgaben
