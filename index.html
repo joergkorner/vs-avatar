@@ -1992,13 +1992,20 @@ L.control.scale({imperial: false}).addTo(map);
 // bis man von Hand zoomte. Jetzt hängen alle Kacheln beider Schichten in einer gemeinsamen Warteschlange: höchstens KACHEL_GLEICH sind
 // unterwegs, der Rest wartet; eine gescheiterte kommt bis viermal mit wachsendem Abstand zurück in die Schlange. Kacheln, die Leaflet
 // inzwischen weggeworfen hat (weil weitergezoomt wurde), werden übersprungen, damit die Schlange nicht mit Altlasten verstopft.
-const KACHEL_GLEICH = 6, KACHEL_VERSUCHE = 4, KACHEL_ZEIT = 15000;
+const KACHEL_GLEICH = 6, KACHEL_VERSUCHE = 4, KACHEL_ZEIT = 8000, KACHEL_NACHLADEN_MS = 3000;
 // Eine Anfrage, die weder ankommt noch abbricht (Safari lässt sie offen), hielt ihren Platz in der Schlange für immer besetzt —
 // nach sechs solchen war Schluss mit Kacheln, bis man die Seite neu lud (Jörg 16.9.). Darum eine Zeitgrenze je Kachel.
+// 17.9. (Jörg: «das sollte einfach nachladen, ob die Karte fährt oder nicht»): drei Löcher gestopft.
+//  1. Bei jedem Zoomwechsel und beim Wegräumen hängt Leaflet laufende Kacheln stumm ab (onload/onerror weg) — ihr Platz in der Schlange
+//     blieb bis zur Zeitgrenze besetzt; beim Folgen (Karte zoomt dauernd) war die Schlange darum meist voll mit Leichen. Jetzt gibt jede
+//     abgehängte Kachel ihren Platz sofort frei (abbrechen).
+//  2. Die Schlange arbeitet die neuesten Anfragen zuerst ab — die gehören zum Bild, das man gerade sieht; alte holen nur nach.
+//  3. Alle KACHEL_NACHLADEN_MS schaut eine Runde nach: endgültig gescheiterte Kacheln werden weggeräumt und fehlende neu angelegt,
+//     ob die Karte gerade fährt oder steht. Nichts bleibt länger als ein paar Sekunden weiss.
 let kachelOffen = 0; const kachelWarte = [];
 // (der Start läuft über setTimeout: Leaflet trägt die Kachel erst NACH createTile in seine Liste ein — startete die Schlange sofort,
 //  hielt die Prüfung «schon weggezoomt» jede erste Kachel für veraltet und es ging gar nichts mehr hinaus)
-function kachelNext() { while (kachelOffen < KACHEL_GLEICH && kachelWarte.length) { const f = kachelWarte.shift(); kachelOffen++; setTimeout(f, 0); } }
+function kachelNext() { while (kachelOffen < KACHEL_GLEICH && kachelWarte.length) { const f = kachelWarte.pop(); kachelOffen++; setTimeout(f, 0); } }
 function kachelAnstellen(f) { kachelWarte.push(f); kachelNext(); }
 const KachelSchicht = L.TileLayer.extend({
   createTile: function (coords, done) {
@@ -2010,17 +2017,32 @@ const KachelSchicht = L.TileLayer.extend({
       if (!fehler) { fertig = true; done(null, tile); return; }
       if (++versuch < KACHEL_VERSUCHE) setTimeout(() => kachelAnstellen(los), 1200 * versuch * versuch);
       else { fertig = true; done(new Error("Kachel"), tile); } };
-    const los = () => { if (!lay._tiles || !lay._tiles[schl]) { kachelOffen--; kachelNext(); return; }   // schon weggezoomt
+    const los = () => { if (fertig || !lay._tiles || !lay._tiles[schl]) { kachelOffen--; kachelNext(); return; }   // schon weggezoomt
       laeuft = true; wecker = setTimeout(() => ab(true), KACHEL_ZEIT);          // hängt die Anfrage, gibt sie ihren Platz wieder frei
       tile.onload = () => ab(false); tile.onerror = () => ab(true);
       tile.src = versuch ? url + (url.indexOf("?") < 0 ? "?" : "&") + "n=" + versuch : url; };
+    tile.abbrechen = () => { fertig = true; if (laeuft) { laeuft = false; clearTimeout(wecker); kachelOffen--; kachelNext(); } };
     kachelAnstellen(los);
     return tile;
+  },
+  _abortLoading: function () {                 // Zoomwechsel: Leaflet hängt laufende Kacheln anderer Zoomstufen ab — Platz freigeben
+    for (const k in this._tiles) { const t = this._tiles[k]; if (t.coords.z !== this._tileZoom && !t.loaded && t.el.abbrechen) t.el.abbrechen(); }
+    return L.TileLayer.prototype._abortLoading.call(this);
+  },
+  _removeTile: function (key) {                // Kachel wird weggeräumt (aus dem Bild gefahren): Platz freigeben
+    const t = this._tiles[key]; if (t && !t.loaded && t.el.abbrechen) t.el.abbrechen();
+    return L.TileLayer.prototype._removeTile.call(this, key);
+  },
+  nachladen: function () {                     // gescheiterte Kacheln weg, fehlende neu anlegen — läuft alle KACHEL_NACHLADEN_MS
+    if (!this._map || !this._tiles) return;
+    for (const k in this._tiles) { const t = this._tiles[k]; if (t.current && t.loaded && t.el.classList.contains("leaflet-tile-error")) this._removeTile(k); }
+    this._update();
   }
 });
 const kachelOpt = {maxZoom: 18, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 2};
 const grund = new KachelSchicht("https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg", Object.assign({opacity: 0.15, attribution: "swisstopo"}, kachelOpt)).addTo(map);
 const relief = new KachelSchicht("https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.leichte-basiskarte_reliefschattierung/default/current/3857/{z}/{x}/{y}.png", Object.assign({opacity: 0.45}, kachelOpt)).addTo(map);
+setInterval(() => { for (const l of [grund, relief]) if (map.hasLayer(l)) l.nachladen(); }, KACHEL_NACHLADEN_MS);
 
 // ------------------------------------------------------------ Datenschichten
 const felder = {}, klassen = {}, laufend = {};
@@ -3538,8 +3560,11 @@ function fuehrtBestimmen(tt) {
   const jetzt = performance.now(), hatA = !!(LAUF && LAUF.lauf), hatP = !!PILOT;
   if (!hatA && !hatP) { FUEHRT.wer = null; return null; }
   if (FUEHRT.fest && jetzt > FUEHRT.festBis) FUEHRT.fest = null;
+  // festgehalten wird nur, wer fliegt: landet er (oder ist er noch nicht gestartet), fällt das Feld sofort an den anderen (Jörg 17.9.)
+  if (FUEHRT.fest && !(FUEHRT.fest === "avatar" ? hatA && fliegtAvatar(tt) : hatP && fliegtPilot(tt))) { FUEHRT.fest = null;
+    for (const [id, w] of [["kfA", "avatar"], ["kfP", "pilot"], ["kfAuto", null]]) document.getElementById(id).classList.toggle("an", w === null); }
   let wer;
-  if (FUEHRT.fest && (FUEHRT.fest === "avatar" ? hatA : hatP)) wer = FUEHRT.fest;
+  if (FUEHRT.fest) wer = FUEHRT.fest;
   else if (!hatP) wer = "avatar";
   else if (!hatA) wer = "pilot";
   else { const fa = fliegtAvatar(tt), fp = fliegtPilot(tt);
